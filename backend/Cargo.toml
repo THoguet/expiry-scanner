@@ -18,3 +18,14 @@ serde_json = "1.0"
 # Logging (Crucial for debugging async code)
 tracing = "0.1"
 tracing-subscriber = "0.3"
+
+# Database (Async Postgres driver)
+# "runtime-tokio" tells it to use the Tokio engine we discussed.
+# "macros" allows us to write SQL directly in Rust code.
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-native-tls", "postgres", "macros", "chrono"] }
+
+# Environment Variables (To read .env files)
+dotenvy = "0.15"
+
+# Date & Time (Compatible with SQLx)
+chrono = { version = "0.4", features = ["serde"] }
