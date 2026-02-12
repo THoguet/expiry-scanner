@@ -1,0 +1,20 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# The Web Framework
+axum = "0.8.8" 
+
+# The Async Runtime (The engine that runs your code)
+# "full" enables all features like file I/O, networking, and time.
+tokio = { version = "1.0", features = ["full"] }
+
+# Serialization (JSON <-> Rust Structs)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging (Crucial for debugging async code)
+tracing = "0.1"
+tracing-subscriber = "0.3"
