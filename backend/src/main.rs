@@ -2,7 +2,12 @@ mod models;
 
 use std::net::SocketAddr;
 
-use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    routing::{delete, get},
+    Json, Router,
+};
 use dotenvy::dotenv;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
@@ -25,6 +30,7 @@ async fn main() {
         .route("/health", get(health_check))
         .route("/db_check", get(db_check))
         .route("/products", get(list_products).post(new_product))
+        .route("/products/:id", delete(delete_product))
         .with_state(pool);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -74,4 +80,11 @@ async fn new_product(
     .await
     .map(|_| StatusCode::OK)
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+async fn delete_product(
+    State(pool): State<PgPool>,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    todo!("todo");
 }
