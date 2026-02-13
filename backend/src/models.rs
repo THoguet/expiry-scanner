@@ -1,12 +1,13 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::prelude::FromRow;
 
 #[derive(Serialize, FromRow)]
 pub struct Product {
-    pub id: i32,
+    pub id: i64,
     pub barcode: String,
     pub expiration_date: chrono::NaiveDate,
-    pub created_at: Option<chrono::NaiveDateTime>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Deserialize)]
