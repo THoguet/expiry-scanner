@@ -1,17 +1,13 @@
 mod models;
+mod queries;
 
 use std::net::SocketAddr;
 
-use axum::{
-    extract::{Path, State},
-    http::StatusCode,
-    routing::{delete, get},
-    Json, Router,
-};
+use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use dotenvy::dotenv;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
-use crate::models::{CreateProduct, Product};
+use crate::models::{CreateProduct, DeleteProduct, Product};
 
 #[tokio::main]
 async fn main() {
@@ -29,8 +25,10 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/db_check", get(db_check))
-        .route("/products", get(list_products).post(new_product))
-        .route("/products/:id", delete(delete_product))
+        .route(
+            "/products",
+            get(list_products).post(new_product).delete(delete_product),
+        )
         .with_state(pool);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -71,20 +69,18 @@ async fn new_product(
     State(pool): State<PgPool>,
     Json(new_product): Json<CreateProduct>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    sqlx::query!(
-        "insert into products (barcode, expiration_date) values ($1, $2)",
-        &new_product.barcode,
-        &new_product.expiration_date
-    )
-    .execute(&pool)
-    .await
-    .map(|_| StatusCode::OK)
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+    queries::insert_product(&new_product, &pool)
+        .await
+        .map(|_| StatusCode::OK)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 
 async fn delete_product(
     State(pool): State<PgPool>,
-    Path(id): Path<i32>,
+    Json(delete_product): Json<DeleteProduct>,
 ) -> Result<StatusCode, (StatusCode, String)> {
-    todo!("todo");
+    queries::delete_product(&delete_product, &pool)
+        .await
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }

@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # The Web Framework
-axum = "0.8.8" 
+axum = "0.8.8"
 
 # The Async Runtime (The engine that runs your code)
 # "full" enables all features like file I/O, networking, and time.
@@ -22,10 +22,19 @@ tracing-subscriber = "0.3"
 # Database (Async Postgres driver)
 # "runtime-tokio" tells it to use the Tokio engine we discussed.
 # "macros" allows us to write SQL directly in Rust code.
-sqlx = { version = "0.8.6", features = ["runtime-tokio", "tls-native-tls", "postgres", "macros", "chrono"] }
+sqlx = { version = "0.8.6", features = [
+	"runtime-tokio",
+	"tls-native-tls",
+	"postgres",
+	"macros",
+	"chrono",
+	"uuid",
+] }
 
 # Environment Variables (To read .env files)
 dotenvy = "0.15"
 
 # Date & Time (Compatible with SQLx)
 chrono = { version = "0.4", features = ["serde"] }
+
+uuid = { version = "1.21.0", features = ["serde", "v4"] }
