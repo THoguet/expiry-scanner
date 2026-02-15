@@ -1,3 +1,8 @@
+use std::time::SystemTime;
+
+use chrono::{ParseError, Utc};
+use serde::de::value::Error;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -13,4 +18,14 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![greet])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+// remember to call `.manage(MyState::default())`
+#[tauri::command]
+async fn calculate_days_left(expiry_date: String, format: String) -> Result<String, ParseError> {
+    let parsed_date = chrono::NaiveDate::parse_from_str(&expiry_date, &format)?;
+
+    let nowDate = Utc::now();
+
+    ""
 }

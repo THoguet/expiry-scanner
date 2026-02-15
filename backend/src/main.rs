@@ -5,9 +5,11 @@ use std::net::SocketAddr;
 
 use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use dotenvy::dotenv;
-use sqlx::{postgres::PgPoolOptions, PgPool};
+use sqlx::{migrate::Migrator, postgres::PgPoolOptions, PgPool};
 
 use crate::models::{CreateProduct, DeleteProduct, Product};
+
+static MIGRATOR: Migrator = sqlx::migrate!(); // <-- This macro embeds the folder!
 
 #[tokio::main]
 async fn main() {
@@ -21,6 +23,10 @@ async fn main() {
         .connect(&database_url)
         .await
         .expect("Failed to create pool");
+
+    tracing::info!("Running database migrations...");
+    MIGRATOR.run(&pool).await.expect("Failed to run migrations");
+    tracing::info!("Migrations successful!");
 
     let app = Router::new()
         .route("/health", get(health_check))

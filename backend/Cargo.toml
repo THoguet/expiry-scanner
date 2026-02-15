@@ -38,3 +38,10 @@ dotenvy = "0.15"
 chrono = { version = "0.4", features = ["serde"] }
 
 uuid = { version = "1.21.0", features = ["serde", "v4"] }
+ts-rs = { version = "12.0.1", features = [
+	"chrono-impl",
+	"uuid-impl",
+	"serde-json-impl",
+	"format",
+	"tokio-impl",
+] }
