@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use chrono::{ParseError, Utc};
+use chrono::{DateTime, Duration, NaiveDate, ParseError, Utc};
 use serde::de::value::Error;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -22,10 +22,9 @@ pub fn run() {
 
 // remember to call `.manage(MyState::default())`
 #[tauri::command]
-async fn calculate_days_left(expiry_date: String, format: String) -> Result<String, ParseError> {
+async fn calculate_days_left(expiry_date: String, format: String) -> Result<i64, ParseError> {
     let parsed_date = chrono::NaiveDate::parse_from_str(&expiry_date, &format)?;
+    let now_date: NaiveDate = Utc::now().date_naive();
 
-    let nowDate = Utc::now();
-
-    ""
+    Ok((parsed_date - now_date).num_days())
 }
