@@ -5,3 +5,13 @@ This template should help get you started developing with Vue 3 and TypeScript i
 ## Recommended IDE Setup
 
 - [VS Code](https://code.visualstudio.com/) + [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+
+## Backend configuration
+
+The mobile frontend talks to the backend through `src/services/backend.ts`.
+
+Set `VITE_BACKEND_URL` to your backend base URL (defaults to `http://127.0.0.1:3000`):
+
+```bash
+VITE_BACKEND_URL=http://192.168.1.12:3000 bun run dev
+```

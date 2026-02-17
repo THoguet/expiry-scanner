@@ -1,11 +1,17 @@
 mod models;
 mod queries;
 
-use std::net::SocketAddr;
+use std::{env, net::SocketAddr};
 
-use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
+use axum::{
+    extract::State,
+    http::{Method, StatusCode},
+    routing::get,
+    Json, Router,
+};
 use dotenvy::dotenv;
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions, PgPool};
+use tower_http::cors::{Any, CorsLayer};
 
 use crate::models::{CreateProduct, DeleteProduct, Product};
 
@@ -16,7 +22,24 @@ async fn main() {
     dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let env = env::var("APP_ENV").unwrap_or_else(|_| "production".to_string());
+
+    let cors = if env == "development" {
+        println!("🔓 CORS: Permissive (Dev Mode)");
+        CorsLayer::permissive()
+    } else {
+        println!("🔒 CORS: Strict (Prod Mode)");
+        CorsLayer::new()
+            .allow_methods([Method::GET, Method::POST, Method::DELETE])
+            .allow_origin([
+                // "https://my-production-app.com".parse().unwrap(), // if web
+                "tauri://localhost".parse().unwrap(), // iOS/macOS
+                "http://tauri.localhost".parse().unwrap(), // Android
+            ])
+            .allow_headers(Any)
+    };
+
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
@@ -35,6 +58,7 @@ async fn main() {
             "/products",
             get(list_products).post(new_product).delete(delete_product),
         )
+        .layer(cors)
         .with_state(pool);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
