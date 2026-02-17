@@ -1,6 +1,6 @@
 <template>
 	<div>
-
+		scanner
 	</div>
 </template>
 
