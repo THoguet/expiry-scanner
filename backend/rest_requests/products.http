@@ -7,7 +7,7 @@ Content-Type: application/json
 
 {
     "barcode": "0123456789124",
-    "expiration_date": "2026-02-07",
+    "expiration_date": "2026-02-05",
     "client_id": "c36edaf3-4d57-47e0-a5fe-ca54d65ccec1"
 }
 

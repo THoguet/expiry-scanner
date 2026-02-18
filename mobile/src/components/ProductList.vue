@@ -1,12 +1,11 @@
 <template>
-	<div>
+	<div style="background-image: url('/empty_fridge.jpg');" class="fridge">
 		<div v-if="loading">Loading products...</div>
 		<div v-else-if="error">{{ error }}</div>
-		<ul v-else>
-			<li v-for="product in products" :key="product.id.toString()">
-				{{ product.barcode }} - {{ product.expiration_date }}
-			</li>
-		</ul>
+		<div v-else class="inner-fridge">
+			<ProductBox v-for="product in products" :key="product.id.toString()" :product="product"
+				@productDeleted="loadProducts" />
+		</div>
 	</div>
 </template>
 
@@ -14,6 +13,7 @@
 import { onMounted, ref } from 'vue';
 import { Product } from '../bindings/Product';
 import { getProducts } from '../services/backend';
+import ProductBox from './ProductBox.vue';
 
 const CLIENT_ID = "mobile-client";
 
@@ -39,4 +39,17 @@ onMounted(loadProducts);
 
 </script>
 
-<style scoped></style>
+<style scoped>
+.fridge {
+	padding-top: 1rem;
+	height: 100%;
+	background-size: cover;
+	background-position: center;
+}
+
+.inner-fridge {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+}
+</style>

@@ -1,6 +1,5 @@
 <template>
 	<main class="container">
-		<Header />
 		<RouterView />
 		<Footer />
 	</main>
@@ -11,7 +10,6 @@ import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { requestPermissions, scan } from "@tauri-apps/plugin-barcode-scanner";
 import Footer from "./components/Footer.vue";
-import Header from "./components/Header.vue";
 
 const greetMsg = ref("");
 const name = ref("");

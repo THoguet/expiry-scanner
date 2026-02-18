@@ -1,0 +1,245 @@
+<template>
+	<div class="box" @pointerdown.stop="startTimerToDelete" @pointerup="clearTimerToDelete"
+		@pointercancel="clearTimerToDelete">
+		<p>{{ product.barcode }}</p>
+		<div style="display: flex; align-items: center; gap: 0.5rem">
+			<FontAwesomeIcon :icon="faCalendar" />
+			<p :class="colorsByDaysLeft">{{ formatDate(product.expiration_date) }} {{ daysLeftLabel }}d</p>
+		</div>
+	</div>
+</template>
+
+<script setup lang="ts">
+import { faCalendar } from '@fortawesome/free-solid-svg-icons';
+import { Product } from '../bindings/Product';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { invoke } from '@tauri-apps/api/core';
+import { computed, onMounted, ref, watch } from 'vue';
+import { deleteProduct } from '../services/backend';
+import { emit } from '@tauri-apps/api/event';
+
+
+const props = defineProps<{
+	product: Product;
+}>()
+
+defineEmits<{
+	(productDeleted: number): void;
+}>();
+
+const colorsByDaysLeft = computed(() => {
+	if (isLoadingDaysLeft.value) return 'text-gray-500';
+	if (daysLeftError.value || daysLeft.value === null) return 'text-gray-500';
+	if (daysLeft.value < 0) return 'text-purple-500';
+	if (daysLeft.value <= 3) return 'text-red-500';
+	if (daysLeft.value <= 7) return 'text-yellow-500';
+	return 'text-green-500';
+});
+
+const daysLeft = ref<number | null>(null);
+const isLoadingDaysLeft = ref(true);
+const daysLeftError = ref(false);
+
+function formatDate(dateString: string): string {
+	const date = new Date(dateString);
+	return date.toLocaleDateString("fr-FR", {
+		year: undefined,
+		month: "numeric",
+		day: "numeric"
+	});
+}
+
+async function getLeftDays(expirationDate: string): Promise<number> {
+	const days = await invoke("calculate_days_left", { expiryDate: expirationDate, format: "%Y-%m-%d" });
+	console.log(days);
+	return days as number;
+}
+
+const daysLeftLabel = computed(() => {
+	if (isLoadingDaysLeft.value) return '...';
+	if (daysLeftError.value || daysLeft.value === null) return 'N/A';
+	return String(daysLeft.value);
+});
+
+async function refreshDaysLeft(): Promise<void> {
+	isLoadingDaysLeft.value = true;
+	daysLeftError.value = false;
+	try {
+		daysLeft.value = await getLeftDays(props.product.expiration_date);
+	} catch (error) {
+		console.error("Error calculating days left:", error);
+		daysLeft.value = null;
+		daysLeftError.value = true;
+	} finally {
+		isLoadingDaysLeft.value = false;
+	}
+}
+
+let deleteTimer: number | null = null;
+
+function startTimerToDelete() {
+	console.log("Start timer to delete product with id:", props.product.id);
+	deleteTimer = window.setTimeout(() => {
+		deleteProduct({ id: props.product.id, client_id: props.product.client_id })
+			.then(() => {
+				console.log("Product deleted successfully");
+				emit("productDeleted", props.product.id);
+			})
+			.catch((error) => {
+				console.error("Error deleting product:", error);
+			});
+	}, 2000);
+}
+
+function clearTimerToDelete() {
+	if (deleteTimer !== null) {
+		clearTimeout(deleteTimer);
+		deleteTimer = null;
+	}
+}
+
+onMounted(refreshDaysLeft);
+
+watch(
+	() => props.product.expiration_date,
+	() => {
+		refreshDaysLeft();
+	}
+);
+
+
+</script>
+
+<style scoped>
+p {
+	margin: 0;
+	font-size: smaller;
+}
+
+.box {
+	border: 1px solid #ccc;
+	padding: 1rem;
+	margin: 1rem;
+	border-radius: 0.5rem;
+	background-color: rgba(255, 255, 255, 0.8);
+	width: 50px;
+	height: 50px;
+	position: relative;
+	user-select: none;
+}
+
+.box:active {
+	animation: shake 2s linear;
+}
+
+@keyframes shake {
+	0% {
+		transform: rotate(0deg);
+	}
+
+	18% {
+		transform: rotate(4deg);
+	}
+
+	31% {
+		transform: rotate(-4deg);
+	}
+
+	42% {
+		transform: rotate(5deg);
+	}
+
+	51% {
+		transform: rotate(-5deg);
+	}
+
+	59% {
+		transform: rotate(5deg);
+	}
+
+	66% {
+		transform: rotate(-5deg);
+	}
+
+	72% {
+		transform: rotate(5deg);
+	}
+
+	77% {
+		transform: rotate(-5deg);
+	}
+
+	81% {
+		transform: rotate(5deg);
+	}
+
+	85% {
+		transform: rotate(-5deg);
+	}
+
+	88% {
+		transform: rotate(5deg);
+	}
+
+	91% {
+		transform: rotate(-5deg);
+	}
+
+	93% {
+		transform: rotate(5deg);
+	}
+
+	95% {
+		transform: rotate(-5deg);
+	}
+
+	96.4% {
+		transform: rotate(5deg);
+	}
+
+	97.5% {
+		transform: rotate(-5deg);
+	}
+
+	98.3% {
+		transform: rotate(5deg);
+	}
+
+	98.9% {
+		transform: rotate(-5deg);
+	}
+
+	99.4% {
+		transform: rotate(5deg);
+	}
+
+	99.7% {
+		transform: rotate(-5deg);
+	}
+
+	100% {
+		transform: rotate(0deg);
+	}
+}
+
+
+.text-gray-500 {
+	color: #9ca3af;
+}
+
+.text-purple-500 {
+	color: #a855f7;
+}
+
+.text-red-500 {
+	color: #ef4444;
+}
+
+.text-yellow-500 {
+	color: #eab308;
+}
+
+.text-green-500 {
+	color: #22c55e;
+}
+</style>
