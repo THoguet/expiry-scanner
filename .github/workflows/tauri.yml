@@ -1,134 +1,113 @@
 name: test-on-pr
 
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "mobile/**"
-      - ".github/workflows/tauri.yml"
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "mobile/**"
-      - ".github/workflows/tauri.yml"
+    push:
+        branches: ["main"]
+        paths:
+            - "mobile/**"
+            - ".github/workflows/tauri.yml"
+    pull_request:
+        branches: ["main"]
+        paths:
+            - "mobile/**"
+            - ".github/workflows/tauri.yml"
 
 jobs:
-  check-mobile:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
+    check-mobile:
+        runs-on: ubuntu-22.04
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: lts/*
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v1
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
+            - name: Install Rust stable
+              uses: dtolnay/rust-toolchain@stable
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: mobile/src-tauri
+            - name: Rust cache
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: mobile/src-tauri
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+            - name: Install system dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
-      - name: Install frontend dependencies
-        working-directory: ./mobile
-        run: bun install
+            - name: Install frontend dependencies
+              working-directory: ./mobile
+              run: bun install
 
-      - name: Build frontend
-        working-directory: ./mobile
-        run: bun run build
+            - name: Build frontend
+              working-directory: ./mobile
+              run: bun run build
 
-      - name: Check Rust code
-        working-directory: ./mobile/src-tauri
-        run: cargo check --locked
+            - name: Check Rust code
+              working-directory: ./mobile/src-tauri
+              run: cargo check --locked
 
-  build-android:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
+    build-mobile:
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: ubuntu-22.04
+                      mobile: android
+                      rust-targets: aarch64-linux-android
+                      args: ""
+                    - platform: macos-latest
+                      mobile: ios
+                      rust-targets: aarch64-apple-ios,aarch64-apple-ios-sim
+                      args: --target aarch64-apple-ios-sim
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
+        runs-on: ${{ matrix.platform }}
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: lts/*
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v1
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+            - name: Setup Java
+              if: matrix.mobile == 'android'
+              uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: "17"
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
+            - name: Setup Android SDK
+              if: matrix.mobile == 'android'
+              uses: android-actions/setup-android@v3
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: mobile/src-tauri
+            - name: Install Rust stable
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: ${{ matrix.rust-targets }}
 
-      - name: Install frontend dependencies
-        working-directory: ./mobile
-        run: bun install
+            - name: Rust cache
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: mobile/src-tauri
 
-      - name: Build Android app
-        uses: tauri-apps/tauri-action@v0.6.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: ./mobile
-          tauriScript: bun tauri
-          mobile: android
+            - name: Install frontend dependencies
+              working-directory: ./mobile
+              run: bun install
 
-  build-ios:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: mobile/src-tauri
-
-      - name: Install frontend dependencies
-        working-directory: ./mobile
-        run: bun install
-
-      - name: Build iOS app
-        uses: tauri-apps/tauri-action@v0.6.1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: ./mobile
-          tauriScript: bun tauri
-          mobile: ios
-          args: --target aarch64-apple-ios-sim
+            - name: Build mobile app
+              uses: tauri-apps/tauri-action@v0.6.1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  projectPath: ./mobile
+                  tauriScript: bun tauri
+                  mobile: ${{ matrix.mobile }}
+                  args: ${{ matrix.args }}
