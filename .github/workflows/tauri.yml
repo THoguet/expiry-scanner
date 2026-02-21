@@ -200,8 +200,7 @@ jobs:
                   # ANDROID_KEY_ALIAS:            key alias
               with:
                   projectPath: ./mobile
-                  tauriScript: bun tauri
-                  mobile: ${{ matrix.mobile }}
+                  tauriScript: bun tauri ${{ matrix.mobile }}
                   args: ${{ matrix.args }}
                   uploadWorkflowArtifacts: true
                   # __VERSION__ is automatically replaced by the version from tauri.conf.json
