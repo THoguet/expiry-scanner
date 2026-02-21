@@ -121,7 +121,7 @@ jobs:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
                   projectPath: ./mobile
-                tauriScript: bun run tauri --
+                  tauriScript: bun run tauri --
                   mobile: ${{ matrix.mobile }}
                   args: ${{ matrix.args }}
 
