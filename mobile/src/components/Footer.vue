@@ -4,8 +4,8 @@
 			:class="router.currentRoute.value.path === '/' ? 'router-active' : ''">
 			<FontAwesomeIcon :icon="faList" />
 		</button>
-		<button type="button" @click="router.push('/scanner')"
-			:class="router.currentRoute.value.path === '/scanner' ? 'router-active' : ''">
+		<button type="button" @click="router.push('/AddProduct')"
+			:class="router.currentRoute.value.path === '/AddProduct' ? 'router-active' : ''">
 			<FontAwesomeIcon :icon="faCamera" />
 		</button>
 	</div>
@@ -24,7 +24,8 @@ const router = useRouter();
 .footer {
 	width: 100vw;
 	height: 7.5vh;
-	background-color: aquamarine;
+	background-color: var(--surface-strong);
+	border-top: 1px solid var(--surface-border);
 	display: flex;
 	justify-content: space-evenly;
 	align-items: center;
@@ -32,7 +33,7 @@ const router = useRouter();
 }
 
 .footer button {
-	color: rgb(61, 126, 104);
+	color: var(--brand-strong);
 	height: 100%;
 	width: 50%;
 	display: flex;
@@ -44,13 +45,13 @@ const router = useRouter();
 }
 
 button.router-active {
-	background-color: rgb(61, 126, 104);
-	color: aquamarine;
+	background-color: var(--brand);
+	color: var(--surface);
 }
 
 .footer button:active {
-	background-color: rgb(61, 126, 104);
-	color: aquamarine;
+	background-color: var(--brand);
+	color: var(--surface);
 }
 
 svg {

@@ -1,11 +1,11 @@
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import ProductList from './components/ProductList.vue'
-import Scanner from './components/Scanner.vue'
+import AddProduct from './components/AddProduct.vue'
 
 const routes = [
 	{ path: '/', component: ProductList },
-	{ path: '/scanner', component: Scanner },
+	{ path: '/AddProduct', component: AddProduct },
 ]
 
 export const router = createRouter({

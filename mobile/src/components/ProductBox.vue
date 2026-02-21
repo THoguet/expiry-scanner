@@ -114,14 +114,15 @@ watch(
 p {
 	margin: 0;
 	font-size: smaller;
+	color: var(--text-primary);
 }
 
 .box {
-	border: 1px solid #ccc;
+	border: 1px solid var(--surface-border);
 	padding: 1rem;
 	margin: 1rem;
 	border-radius: 0.5rem;
-	background-color: rgba(255, 255, 255, 0.8);
+	background-color: var(--surface-overlay);
 	width: 50px;
 	height: 50px;
 	position: relative;

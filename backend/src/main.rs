@@ -1,30 +1,65 @@
+mod controller;
 mod models;
 mod queries;
+mod service;
 
-use std::{env, net::SocketAddr};
+use std::{env, error::Error, net::SocketAddr};
 
-use axum::{
-    extract::State,
-    http::{Method, StatusCode},
-    routing::get,
-    Json, Router,
-};
+use axum::http::Method;
+use clap::Parser;
 use dotenvy::dotenv;
-use sqlx::{migrate::Migrator, postgres::PgPoolOptions, PgPool};
+use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 use tower_http::cors::{Any, CorsLayer};
 
-use crate::models::{CreateProduct, DeleteProduct, Product};
+#[derive(Parser)]
+#[command(
+    name = "Expiry Scanner CLI",
+    version,
+    about = "A CLI for managing the Expiry Scanner backend"
+)]
+pub struct Args {
+    // Import barcode database from a CSV file
+    #[arg(short, long, value_name = "FILE")]
+    import_barcode_csv: Option<String>,
+}
 
 static MIGRATOR: Migrator = sqlx::migrate!(); // <-- This macro embeds the folder!
 
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        tokio::signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {},
+        _ = terminate => {},
+    }
+
+    tracing::info!("Shutdown signal received");
+}
+
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn Error>> {
+    let cli = Args::parse();
     dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let env = env::var("APP_ENV").unwrap_or_else(|_| "production".to_string());
+    let app_env = env::var("APP_ENV").unwrap_or_else(|_| "production".to_string());
 
-    let cors = if env == "development" {
+    let cors = if app_env == "development" {
         println!("🔓 CORS: Permissive (Dev Mode)");
         CorsLayer::permissive()
     } else {
@@ -44,73 +79,27 @@ async fn main() {
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect(&database_url)
-        .await
-        .expect("Failed to create pool");
+        .await?;
 
     tracing::info!("Running database migrations...");
-    MIGRATOR.run(&pool).await.expect("Failed to run migrations");
+    MIGRATOR.run(&pool).await?;
     tracing::info!("Migrations successful!");
 
-    let app = Router::new()
-        .route("/health", get(health_check))
-        .route("/db_check", get(db_check))
-        .route(
-            "/products",
-            get(list_products).post(new_product).delete(delete_product),
-        )
-        .layer(cors)
-        .with_state(pool);
+    if let Some(file_path) = cli.import_barcode_csv.as_deref() {
+        service::barcode::import_from_csv(file_path, &pool).await?;
+        tracing::info!("CSV import completed. Exiting without starting API server.");
+        return Ok(());
+    }
+
+    let app = controller::router(pool).layer(cors);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     println!("Listening on {}", addr);
 
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    axum::serve(listener, app).await.unwrap();
-}
-
-async fn health_check() -> &'static str {
-    "OK"
-}
-
-async fn db_check(State(pool): State<PgPool>) -> &'static str {
-    let response = sqlx::query("SELECT 1").execute(&pool).await;
-
-    match response {
-        Ok(_) => "DB OK",
-        Err(_) => "DB FAIL",
-    }
-}
-
-async fn list_products(
-    State(pool): State<PgPool>,
-) -> Result<Json<Vec<Product>>, (StatusCode, String)> {
-    sqlx::query_as!(
-        Product,
-        "select * from products order by expiration_date asc"
-    )
-    .fetch_all(&pool)
-    .await
-    .map(|value| Json::from(value))
-    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-}
-
-async fn new_product(
-    State(pool): State<PgPool>,
-    Json(new_product): Json<CreateProduct>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    queries::insert_product(&new_product, &pool)
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
         .await
-        .map(|_| StatusCode::OK)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
-}
-
-async fn delete_product(
-    State(pool): State<PgPool>,
-    Json(delete_product): Json<DeleteProduct>,
-) -> Result<StatusCode, (StatusCode, String)> {
-    queries::delete_product(&delete_product, &pool)
-        .await
-        .map(|_| StatusCode::NO_CONTENT)
-        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+        .map_err(|e| Box::new(e) as Box<dyn Error>)
 }
