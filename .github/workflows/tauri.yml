@@ -65,7 +65,7 @@ jobs:
                     - platform: ubuntu-22.04
                       mobile: android
                       rust-targets: aarch64-linux-android
-                      args: ""
+                      args: "--apk"
                     - platform: macos-latest
                       mobile: ios
                       rust-targets: aarch64-apple-ios,aarch64-apple-ios-sim
@@ -137,12 +137,11 @@ jobs:
                     - platform: ubuntu-22.04
                       mobile: android
                       rust-targets: aarch64-linux-android
-                      args: ""
-                    - platform: macos-latest
-                      mobile: ios
-                      # Use device target for real releases (not simulator)
-                      rust-targets: aarch64-apple-ios
-                      args: --target aarch64-apple-ios
+                      args: "--apk"
+                    # iOS is intentionally excluded from releases:
+                    # - tauri-action's iOS mobile artifact detection is experimental and broken
+                    # - A bare .ipa is not installable without Apple signing + TestFlight/MDM
+                    # iOS is still built in build-mobile (simulator) for CI verification.
 
         runs-on: ${{ matrix.platform }}
         permissions:
@@ -199,16 +198,12 @@ jobs:
                   # ANDROID_KEY_STORE_PASSWORD:   keystore password
                   # ANDROID_KEY_PASSWORD:         key password
                   # ANDROID_KEY_ALIAS:            key alias
-                  #
-                  # iOS release signing — add these in repo Settings → Secrets:
-                  # APPLE_CERTIFICATE:            base64-encoded .p12 certificate
-                  # APPLE_CERTIFICATE_PASSWORD:   certificate password
-                  # APPLE_PROVISIONING_PROFILE:   base64-encoded .mobileprovision
               with:
                   projectPath: ./mobile
                   tauriScript: bun tauri
                   mobile: ${{ matrix.mobile }}
                   args: ${{ matrix.args }}
+                  uploadWorkflowArtifacts: true
                   # __VERSION__ is automatically replaced by the version from tauri.conf.json
                   tagName: mobile-v__VERSION__
                   releaseName: "Mobile v__VERSION__"
@@ -217,7 +212,6 @@ jobs:
                       See commit history for changes in this release.
 
                       ## Install
-                      - **Android**: download the `.apk` below and sideload it, or install via your MDM.
-                      - **iOS**: requires the `.ipa` to be signed and distributed via TestFlight or MDM.
+                      **Android**: download the `.apk` below and sideload it, or distribute via MDM.
                   releaseDraft: true
                   prerelease: false
