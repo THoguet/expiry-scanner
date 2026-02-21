@@ -1,19 +1,20 @@
-name: test-on-pr
+name: Mobile
 
 on:
     push:
-        branches: ["main"]
+        branches: ["**"]
         paths:
             - "mobile/**"
             - ".github/workflows/tauri.yml"
     pull_request:
-        branches: ["main"]
+        branches: ["**"]
         paths:
             - "mobile/**"
             - ".github/workflows/tauri.yml"
 
 jobs:
     check-mobile:
+        name: Check
         runs-on: ubuntu-22.04
         steps:
             - uses: actions/checkout@v4
@@ -52,8 +53,11 @@ jobs:
               working-directory: ./mobile/src-tauri
               run: cargo check --locked
 
+    # ── Non-main branches & PRs: build only (no release) ───────────────────────
     build-mobile:
+        name: Build ${{ matrix.mobile }}
         needs: check-mobile
+        if: github.ref != 'refs/heads/main'
         strategy:
             fail-fast: false
             matrix:
@@ -120,3 +124,100 @@ jobs:
                   tauriScript: bun tauri
                   mobile: ${{ matrix.mobile }}
                   args: ${{ matrix.args }}
+
+    # ── main branch: build + create a GitHub Release (draft) ───────────────────
+    release-mobile:
+        name: Release ${{ matrix.mobile }}
+        needs: check-mobile
+        if: github.ref == 'refs/heads/main'
+        strategy:
+            fail-fast: false
+            matrix:
+                include:
+                    - platform: ubuntu-22.04
+                      mobile: android
+                      rust-targets: aarch64-linux-android
+                      args: ""
+                    - platform: macos-latest
+                      mobile: ios
+                      # Use device target for real releases (not simulator)
+                      rust-targets: aarch64-apple-ios
+                      args: --target aarch64-apple-ios
+
+        runs-on: ${{ matrix.platform }}
+        permissions:
+            contents: write # required to create GitHub Releases
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: lts/*
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v1
+
+            - name: Setup Java
+              if: matrix.mobile == 'android'
+              uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: "17"
+
+            - name: Setup Android SDK
+              if: matrix.mobile == 'android'
+              uses: android-actions/setup-android@v3
+
+            - name: Install Rust stable
+              uses: dtolnay/rust-toolchain@stable
+              with:
+                  targets: ${{ matrix.rust-targets }}
+
+            - name: Rust cache
+              uses: Swatinem/rust-cache@v2
+              with:
+                  workspaces: mobile/src-tauri
+
+            - name: Install frontend dependencies
+              working-directory: ./mobile
+              run: bun install
+
+            - name: Install system dependencies (ubuntu only)
+              if: matrix.platform == 'ubuntu-22.04'
+              uses: awalsh128/cache-apt-pkgs-action@v1
+              with:
+                  packages: libgtk-3-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+                  version: 1
+
+            - name: Build and release mobile app
+              uses: tauri-apps/tauri-action@v0.6.1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  # Android release signing — add these in repo Settings → Secrets & variables → Actions:
+                  # ANDROID_SIGNING_KEY:          base64-encoded .jks keystore
+                  # ANDROID_KEY_STORE_PASSWORD:   keystore password
+                  # ANDROID_KEY_PASSWORD:         key password
+                  # ANDROID_KEY_ALIAS:            key alias
+                  #
+                  # iOS release signing — add these in repo Settings → Secrets:
+                  # APPLE_CERTIFICATE:            base64-encoded .p12 certificate
+                  # APPLE_CERTIFICATE_PASSWORD:   certificate password
+                  # APPLE_PROVISIONING_PROFILE:   base64-encoded .mobileprovision
+              with:
+                  projectPath: ./mobile
+                  tauriScript: bun tauri
+                  mobile: ${{ matrix.mobile }}
+                  args: ${{ matrix.args }}
+                  # __VERSION__ is automatically replaced by the version from tauri.conf.json
+                  tagName: mobile-v__VERSION__
+                  releaseName: "Mobile v__VERSION__"
+                  releaseBody: |
+                      ## What's new
+                      See commit history for changes in this release.
+
+                      ## Install
+                      - **Android**: download the `.apk` below and sideload it, or install via your MDM.
+                      - **iOS**: requires the `.ipa` to be signed and distributed via TestFlight or MDM.
+                  releaseDraft: true
+                  prerelease: false
