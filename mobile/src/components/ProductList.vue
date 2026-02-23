@@ -3,20 +3,18 @@
 		<div v-if="loading" class="status-text">Loading products...</div>
 		<div v-else-if="error" class="status-text">{{ error }}</div>
 		<div v-else class="inner-fridge">
-			<ProductBox v-for="product in products" :key="product.id.toString()" :product="product"
-				@productDeleted="loadProducts" />
+			<ProductBox v-for="product in products" :product="product" @productDeleted="loadProducts" />
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { Product } from '../bindings/Product';
-import { getProducts } from '../services/backend';
+import { getProductsWithBarcode, ProductWithBarcode } from '../services/backend';
 import ProductBox from './ProductBox.vue';
 import { CLIENT_ID } from '../main';
 
-const products = ref<Product[]>([]);
+const products = ref<ProductWithBarcode[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 
@@ -25,7 +23,7 @@ async function loadProducts() {
 	error.value = null;
 
 	try {
-		products.value = await getProducts(CLIENT_ID);
+		products.value = await getProductsWithBarcode(CLIENT_ID);
 	} catch (backendError) {
 		console.error(backendError);
 		error.value = "Failed to load products";

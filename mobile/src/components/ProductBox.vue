@@ -1,31 +1,40 @@
 <template>
-	<div class="box" @pointerdown.stop="startTimerToDelete" @pointerup="clearTimerToDelete"
-		@pointercancel="clearTimerToDelete">
-		<p>{{ product.barcode }}</p>
+	<div class="box" :style="`background-image: url('${barcode?.image_url}')`" @pointerdown.stop="startTimerToDelete"
+		@pointerup="clearTimerToDelete" @pointercancel="clearTimerToDelete">
+		<p>{{ barcode?.product_name }}</p>
 		<div style="display: flex; align-items: center; gap: 0.5rem">
 			<FontAwesomeIcon :icon="faCalendar" />
-			<p :class="colorsByDaysLeft">{{ formatDate(product.expiration_date) }} {{ daysLeftLabel }}d</p>
+			<p :class="colorsByDaysLeft">{{ formatDate(pro.expiration_date) }} {{ daysLeftLabel }}d</p>
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
 import { faCalendar } from '@fortawesome/free-solid-svg-icons';
-import { Product } from '../bindings/Product';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { invoke } from '@tauri-apps/api/core';
-import { computed, onMounted, ref, watch } from 'vue';
-import { deleteProduct } from '../services/backend';
+import { computed, onMounted, Ref, ref, watch } from 'vue';
+import { deleteProduct, ProductWithBarcode } from '../services/backend';
 import { emit } from '@tauri-apps/api/event';
+import { Product } from '../bindings/Product';
+import { Barcode } from '../bindings/Barcode';
 
 
 const props = defineProps<{
-	product: Product;
+	product: ProductWithBarcode;
 }>()
 
 defineEmits<{
 	(productDeleted: number): void;
 }>();
+
+let pro: Ref<Product> = ref(props.product[0]);
+let barcode: Ref<Barcode | null> = ref(props.product[1] || null);
+
+watch(() => props.product, (newProduct) => {
+	pro.value = newProduct[0];
+	barcode.value = newProduct[1] || null;
+}, { deep: true, immediate: true });
 
 const colorsByDaysLeft = computed(() => {
 	if (isLoadingDaysLeft.value) return 'text-gray-500';
@@ -65,7 +74,7 @@ async function refreshDaysLeft(): Promise<void> {
 	isLoadingDaysLeft.value = true;
 	daysLeftError.value = false;
 	try {
-		daysLeft.value = await getLeftDays(props.product.expiration_date);
+		daysLeft.value = await getLeftDays(pro.value.expiration_date);
 	} catch (error) {
 		console.error("Error calculating days left:", error);
 		daysLeft.value = null;
@@ -78,12 +87,12 @@ async function refreshDaysLeft(): Promise<void> {
 let deleteTimer: number | null = null;
 
 function startTimerToDelete() {
-	console.log("Start timer to delete product with id:", props.product.id);
+	console.log("Start timer to delete product with id:", pro.value.id);
 	deleteTimer = window.setTimeout(() => {
-		deleteProduct({ id: props.product.id, client_id: props.product.client_id })
+		deleteProduct({ id: pro.value.id, client_id: pro.value.client_id })
 			.then(() => {
 				console.log("Product deleted successfully");
-				emit("productDeleted", props.product.id);
+				emit("productDeleted", pro.value.id);
 			})
 			.catch((error) => {
 				console.error("Error deleting product:", error);
@@ -99,14 +108,6 @@ function clearTimerToDelete() {
 }
 
 onMounted(refreshDaysLeft);
-
-watch(
-	() => props.product.expiration_date,
-	() => {
-		refreshDaysLeft();
-	}
-);
-
 
 </script>
 

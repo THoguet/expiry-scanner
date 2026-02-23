@@ -1,21 +1,32 @@
 # STAGE 1: Build
-FROM rust:1.93.1 as builder
+FROM rust:1.93.1 AS builder
+
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends libssl-dev ca-certificates \
+	&& rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY . .
 
-# This builds the binary in release mode (optimized for speed)
-# It will be located at /app/target/release/api
+# Cache dependencies first (changes here invalidate less often)
+COPY Cargo.toml Cargo.lock* build.rs ./
+RUN mkdir -p src \
+	&& printf 'fn main() {}\n' > src/main.rs \
+	&& cargo build --release \
+	&& rm -rf src
+
+# Copy application code last so only this layer invalidates on code changes
+COPY src ./src
+COPY migrations ./migrations
+
 RUN cargo build --release
 
 # STAGE 2: Run
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim AS runtime
 
-# Install OpenSSL (needed for Linux networking)
-RUN apt update && apt install -y libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+	&& apt-get install -y --no-install-recommends ca-certificates libssl3 \
+	&& rm -rf /var/lib/apt/lists/*
 
-# Copy the binary from the builder stage
 COPY --from=builder /app/target/release/api /usr/local/bin/api
 
-# Set the startup command
 CMD ["api"]

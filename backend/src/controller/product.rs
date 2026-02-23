@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     routing::get,
     Json, Router,
@@ -18,10 +18,13 @@ struct ProductQuery {
 }
 
 pub fn router() -> Router<PgPool> {
-    Router::new().route(
-        "/",
-        get(list_products).post(new_product).delete(delete_product),
-    )
+    Router::new()
+        .route(
+            "/",
+            get(list_products).post(new_product).delete(delete_product),
+        )
+        .route("/with-barcode", get(list_with_barcode))
+        .route("/with-barcode/{product_id}", get(get_by_id_with_barcode))
 }
 
 async fn list_products(
@@ -51,4 +54,23 @@ async fn delete_product(
         .await
         .map(|_| StatusCode::NO_CONTENT)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+async fn list_with_barcode(
+    State(pool): State<PgPool>,
+    Query(ProductQuery { client_id }): Query<ProductQuery>,
+) -> Result<Json<Vec<(Product, Option<crate::models::Barcode>)>>, (StatusCode, String)> {
+    service::product::list_product_with_barcode(&pool, client_id)
+        .await
+        .map(Json)
+}
+
+async fn get_by_id_with_barcode(
+    State(pool): State<PgPool>,
+    Path(product_id): Path<i64>,
+    Query(ProductQuery { client_id }): Query<ProductQuery>,
+) -> Result<Json<(Product, Option<crate::models::Barcode>)>, (StatusCode, String)> {
+    service::product::get_product_by_id_with_barcode(&pool, product_id, client_id)
+        .await
+        .map(Json)
 }

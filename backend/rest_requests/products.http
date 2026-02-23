@@ -10,7 +10,7 @@ POST http://localhost:3000/products HTTP/1.1
 Content-Type: application/json
 
 {
-    "barcode": "0123456789124",
+    "barcode": "5055950623132",
     "expiration_date": "2026-02-05",
     "client_id": "c36edaf3-4d57-47e0-a5fe-ca54d65ccec1"
 }
@@ -31,3 +31,7 @@ GET http://localhost:3000/barcodes/3242274030056 HTTP/1.1
 ###
 
 GET http://localhost:3000/barcodes HTTP/1.1
+
+###
+
+GET http://localhost:3000/products/with-barcode?client_id=c36edaf3-4d57-47e0-a5fe-ca54d65ccec1 HTTP/1.1

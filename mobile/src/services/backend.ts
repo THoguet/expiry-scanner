@@ -1,6 +1,7 @@
 import type { CreateProduct } from "../bindings/CreateProduct";
 import type { DeleteProduct } from "../bindings/DeleteProduct";
 import type { Product } from "../bindings/Product";
+import type { Barcode } from "../bindings/Barcode";
 
 const DEFAULT_BACKEND_URL = "http://192.168.1.22:3000";
 
@@ -59,4 +60,13 @@ export async function deleteProduct(payload: DeleteProduct): Promise<void> {
 		method: "DELETE",
 		body: JSON.stringify(payload),
 	});
+}
+
+export type ProductWithBarcode = [Product, Barcode | null];
+
+export async function getProductsWithBarcode(clientId: string): Promise<ProductWithBarcode[]> {
+	const products = await request<ProductWithBarcode[]>(`/products?client_id=${encodeURIComponent(clientId)}&with_barcode=true`);
+	if (!products) return [];
+	return products;
+
 }
