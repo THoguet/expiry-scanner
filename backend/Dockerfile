@@ -1,28 +1,27 @@
-# STAGE 1: Build
-FROM rust:1.93.1 AS builder
-
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends libssl-dev ca-certificates \
-	&& rm -rf /var/lib/apt/lists/*
-
+# STAGE 1: Chef setup
+FROM rust:1.93.1 AS chef
+USER root
+RUN cargo install cargo-chef
 WORKDIR /app
 
-# Cache dependencies first (changes here invalidate less often)
-COPY Cargo.toml Cargo.lock* build.rs ./
-RUN mkdir -p src \
-	&& printf 'fn main() {}\n' > src/main.rs \
-	&& cargo build --release \
-	&& rm -rf src
+# STAGE 2: Prepare a recipe
+FROM chef AS planner
+COPY . .
+# Compute a lock-like file for our project
+RUN cargo chef prepare --recipe-path recipe.json
 
-# Copy application code last so only this layer invalidates on code changes
-COPY src ./src
-COPY migrations ./migrations
-
+# STAGE 3: Build dependencies
+FROM chef AS builder
+WORKDIR /app
+COPY --from=planner /app/recipe.json recipe.json
+# Build dependencies - this is the cached layer!
+RUN cargo chef cook --release --recipe-path recipe.json
+# Build application
+COPY . .
 RUN cargo build --release
 
-# STAGE 2: Run
+# STAGE 4: Run
 FROM debian:bookworm-slim AS runtime
-
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends ca-certificates libssl3 \
 	&& rm -rf /var/lib/apt/lists/*
