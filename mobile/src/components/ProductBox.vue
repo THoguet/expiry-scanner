@@ -1,10 +1,12 @@
 <template>
-	<div class="box" :style="`background-image: url('${barcode?.image_url}')`" @pointerdown.stop="startTimerToDelete"
+	<div class="box" :style="`background-image: url('${getImageUrl()}')`" @pointerdown.stop="startTimerToDelete"
 		@pointerup="clearTimerToDelete" @pointercancel="clearTimerToDelete">
-		<p>{{ barcode?.product_name }}</p>
-		<div style="display: flex; align-items: center; gap: 0.5rem">
-			<FontAwesomeIcon :icon="faCalendar" />
-			<p :class="colorsByDaysLeft">{{ formatDate(pro.expiration_date) }} {{ daysLeftLabel }}d</p>
+		<div class="text-background">
+			<p>{{ getName() }}</p>
+			<div style="display: flex; align-items: center; gap: 0.5rem">
+				<FontAwesomeIcon :icon="faCalendar" />
+				<p :class="colorsByDaysLeft">{{ formatDate(pro.expiration_date) }} {{ daysLeftLabel }}d</p>
+			</div>
 		</div>
 	</div>
 </template>
@@ -48,6 +50,16 @@ const colorsByDaysLeft = computed(() => {
 const daysLeft = ref<number | null>(null);
 const isLoadingDaysLeft = ref(true);
 const daysLeftError = ref(false);
+
+function getName(): string {
+	if (barcode.value && barcode.value.product_name) return barcode.value.product_name;
+	return "Unknown product; ID: " + pro.value.barcode;
+}
+
+function getImageUrl(): string {
+	if (barcode.value && barcode.value.image_url) return barcode.value.image_url;
+	return "/no_img.png";
+}
 
 function formatDate(dateString: string): string {
 	const date = new Date(dateString);
@@ -121,13 +133,22 @@ p {
 .box {
 	border: 1px solid var(--surface-border);
 	padding: 1rem;
-	margin: 1rem;
 	border-radius: 0.5rem;
 	background-color: var(--surface-overlay);
-	width: 50px;
-	height: 50px;
+	min-width: 50px;
+	min-height: 50px;
+	max-width: calc(40vw - 2rem);
+	max-height: calc(40vw - 2rem);
 	position: relative;
 	user-select: none;
+	background-size: contain;
+	background-position: center;
+}
+
+.text-background {
+	background: var(--surface-overlay);
+	padding: 0.5rem;
+	border-radius: 0.5rem;
 }
 
 .box:active {

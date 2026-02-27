@@ -2,7 +2,7 @@ GET http://localhost:3000/products HTTP/1.1
 
 ###
 
-GET http://localhost:3000/products?client_id=c36edaf3-4d57-47e0-a5fe-ca54d65ccec1 HTTP/1.1
+GET http://localhost:3000/products?client_id=a3057b80-46d0-4013-9509-9eebd4a8ca2b HTTP/1.1
 
 ###
 
@@ -12,7 +12,7 @@ Content-Type: application/json
 {
     "barcode": "5055950623132",
     "expiration_date": "2026-02-05",
-    "client_id": "c36edaf3-4d57-47e0-a5fe-ca54d65ccec1"
+    "client_id": "a3057b80-46d0-4013-9509-9eebd4a8ca2b"
 }
 
 ###
@@ -21,8 +21,8 @@ DELETE http://localhost:3000/products HTTP/1.1
 Content-Type: application/json
 
 {
-	"id": 1,
-    "client_id": "c36edaf3-4d57-47e0-a5fe-ca54d65ccec1"
+	"id": 8,
+    "client_id": "a3057b80-46d0-4013-9509-9eebd4a8ca2b"
 }
 
 ###
@@ -34,4 +34,4 @@ GET http://localhost:3000/barcodes HTTP/1.1
 
 ###
 
-GET http://localhost:3000/products/with-barcode?client_id=c36edaf3-4d57-47e0-a5fe-ca54d65ccec1 HTTP/1.1
+GET http://localhost:3000/products/with-barcode?client_id=a3057b80-46d0-4013-9509-9eebd4a8ca2b HTTP/1.1

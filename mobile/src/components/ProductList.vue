@@ -4,6 +4,9 @@
 		<div v-else-if="error" class="status-text">{{ error }}</div>
 		<div v-else class="inner-fridge">
 			<ProductBox v-for="product in products" :product="product" @productDeleted="loadProducts" />
+			<div v-if="products.length === 0" class="status-text">
+				<p>Your fridge is empty! Add some products to get started.</p>
+			</div>
 		</div>
 	</div>
 </template>
@@ -39,11 +42,13 @@ onMounted(loadProducts);
 <style scoped>
 .fridge {
 	padding-top: 1rem;
-	height: 100%;
 	background-size: cover;
 	background-position: center;
 	color: var(--text-primary);
 	position: relative;
+	padding-bottom: 7.5vh;
+	height: calc(100% - 7.5vh - 1rem);
+	overflow: hidden;
 }
 
 .fridge::before {
@@ -58,6 +63,13 @@ onMounted(loadProducts);
 .inner-fridge {
 	position: relative;
 	z-index: 1;
+	height: 100%;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	flex-direction: row;
+	overflow: scroll;
+	gap: 1rem;
 }
 
 .status-text {

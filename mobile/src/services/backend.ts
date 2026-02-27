@@ -3,7 +3,7 @@ import type { DeleteProduct } from "../bindings/DeleteProduct";
 import type { Product } from "../bindings/Product";
 import type { Barcode } from "../bindings/Barcode";
 
-const DEFAULT_BACKEND_URL = "http://192.168.1.22:3000";
+const DEFAULT_BACKEND_URL = "https://expiry.nessar.fr";
 
 function getBaseUrl(): string {
 	const configuredUrl = import.meta.env.VITE_BACKEND_URL?.trim();
@@ -65,7 +65,7 @@ export async function deleteProduct(payload: DeleteProduct): Promise<void> {
 export type ProductWithBarcode = [Product, Barcode | null];
 
 export async function getProductsWithBarcode(clientId: string): Promise<ProductWithBarcode[]> {
-	const products = await request<ProductWithBarcode[]>(`/products?client_id=${encodeURIComponent(clientId)}&with_barcode=true`);
+	const products = await request<ProductWithBarcode[]>(`/products/with-barcode?client_id=${encodeURIComponent(clientId)}`);
 	if (!products) return [];
 	return products;
 

@@ -4,7 +4,7 @@ use sqlx::prelude::FromRow;
 use ts_rs::TS;
 use uuid::Uuid;
 
-#[derive(Serialize, FromRow, TS)]
+#[derive(Serialize, FromRow, TS, Debug)]
 #[ts(export)]
 pub struct Product {
     pub id: i64,
@@ -29,7 +29,7 @@ pub struct DeleteProduct {
     pub client_id: Uuid,
 }
 
-#[derive(Serialize, FromRow, TS)]
+#[derive(Serialize, Deserialize, FromRow, TS, Debug)]
 #[ts(export)]
 pub struct Barcode {
     pub id: i64,

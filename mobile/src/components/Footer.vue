@@ -30,6 +30,9 @@ const router = useRouter();
 	justify-content: space-evenly;
 	align-items: center;
 	flex-direction: row;
+	position: fixed;
+	bottom: 0;
+	z-index: 100;
 }
 
 .footer button {

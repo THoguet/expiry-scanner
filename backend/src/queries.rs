@@ -1,8 +1,22 @@
 use std::error::Error;
 
+use sqlx::types::Json;
 use sqlx::PgPool;
 
-use crate::models::{CreateProduct, DeleteProduct, Product};
+use crate::models::{Barcode, CreateProduct, DeleteProduct, Product};
+
+#[derive(sqlx::FromRow)]
+struct ProductWithOptionalBarcodeRow {
+    #[sqlx(flatten)]
+    product: Product,
+    barcode_payload: Option<Json<Barcode>>,
+}
+
+impl ProductWithOptionalBarcodeRow {
+    fn into_tuple(self) -> (Product, Option<Barcode>) {
+        (self.product, self.barcode_payload.map(|barcode| barcode.0))
+    }
+}
 
 pub async fn insert_product(
     new_product: &CreateProduct,
@@ -53,18 +67,14 @@ pub async fn list_join_product_barcode_barcode_code(
     pool: &PgPool,
     client_id: uuid::Uuid,
 ) -> Result<Vec<(Product, Option<crate::models::Barcode>)>, Box<dyn Error>> {
-    let query = "select p.*, b.* from products p left join barcode_database b on p.barcode = b.code where p.client_id=$1 order by p.expiration_date asc";
+    let query = "select p.*, to_jsonb(b) as barcode_payload from products p left join barcode_database b on p.barcode = b.code where p.client_id=$1 order by p.expiration_date asc";
 
-    let rows = sqlx::query(query).bind(&client_id).fetch_all(pool).await?;
+    let rows = sqlx::query_as::<_, ProductWithOptionalBarcodeRow>(query)
+        .bind(&client_id)
+        .fetch_all(pool)
+        .await?;
 
-    let products_with_barcodes = rows
-        .into_iter()
-        .map(|row| {
-            let product = sqlx::FromRow::from_row(&row).ok();
-            let barcode = sqlx::FromRow::from_row(&row).ok();
-            (product.unwrap(), barcode)
-        })
-        .collect();
+    let products_with_barcodes = rows.into_iter().map(|row| row.into_tuple()).collect();
 
     Ok(products_with_barcodes)
 }
@@ -74,16 +84,13 @@ pub async fn get_product_by_id_with_barcode(
     product_id: i64,
     client_id: uuid::Uuid,
 ) -> Result<(Product, Option<crate::models::Barcode>), Box<dyn Error>> {
-    let query = "select p.*, b.* from products p left join barcode_database b on p.barcode = b.code where p.id=$1 and p.client_id=$2";
+    let query = "select p.*, to_jsonb(b) as barcode_payload from products p left join barcode_database b on p.barcode = b.code where p.id=$1 and p.client_id=$2";
 
-    let row = sqlx::query(query)
+    let row = sqlx::query_as::<_, ProductWithOptionalBarcodeRow>(query)
         .bind(&product_id)
         .bind(&client_id)
         .fetch_one(pool)
         .await?;
 
-    let product = sqlx::FromRow::from_row(&row).ok();
-    let barcode = sqlx::FromRow::from_row(&row).ok();
-
-    Ok((product.unwrap(), barcode))
+    Ok(row.into_tuple())
 }
