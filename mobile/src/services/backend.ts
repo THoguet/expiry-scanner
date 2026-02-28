@@ -2,6 +2,7 @@ import type { CreateProduct } from "../bindings/CreateProduct";
 import type { DeleteProduct } from "../bindings/DeleteProduct";
 import type { Product } from "../bindings/Product";
 import type { Barcode } from "../bindings/Barcode";
+import { EditProduct } from "../bindings/EditProduct";
 
 const DEFAULT_BACKEND_URL = "https://expiry.nessar.fr";
 
@@ -60,6 +61,19 @@ export async function deleteProduct(payload: DeleteProduct): Promise<void> {
 		method: "DELETE",
 		body: JSON.stringify(payload),
 	});
+}
+
+export async function editProduct(payload: EditProduct): Promise<Product> {
+	const updated = await request<Product>("/products", {
+		method: "PUT",
+		body: JSON.stringify(payload),
+	});
+
+	if (!updated) {
+		throw new Error("Failed to edit product");
+	}
+
+	return updated;
 }
 
 export type ProductWithBarcode = [Product, Barcode | null];

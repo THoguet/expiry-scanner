@@ -45,7 +45,7 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { emit } from '@tauri-apps/api/event';
 import { checkPermissions, scan, requestPermissions, Format, cancel } from '@tauri-apps/plugin-barcode-scanner';
 import { onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
-import { createProduct } from '../services/backend';
+import { addProduct } from '../services/products';
 import { CLIENT_ID } from '../main';
 
 let scanning = ref(false);
@@ -162,7 +162,7 @@ function createNewProduct() {
 		setAddError(verificationResult as string);
 		return;
 	}
-	createProduct({
+	addProduct({
 		barcode: productInfo.value.barCode,
 		expiration_date: `${'20' + productInfo.value.expiryYear}-${String(productInfo.value.expiryMonth).padStart(2, '0')}-${String(productInfo.value.expiryDay).padStart(2, '0')}`,
 		client_id: CLIENT_ID,

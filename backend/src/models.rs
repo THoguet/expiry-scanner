@@ -24,6 +24,15 @@ pub struct CreateProduct {
 
 #[derive(Deserialize, TS)]
 #[ts(export)]
+pub struct EditProduct {
+    pub id: i64,
+    pub barcode: String,
+    pub expiration_date: chrono::NaiveDate,
+    pub client_id: Uuid,
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
 pub struct DeleteProduct {
     pub id: i64,
     pub client_id: Uuid,

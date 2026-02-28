@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use sqlx::PgPool;
 
 use crate::{
-    models::{Barcode, CreateProduct, DeleteProduct, Product},
+    models::{Barcode, CreateProduct, DeleteProduct, EditProduct, Product},
     queries,
 };
 
@@ -25,6 +25,13 @@ pub async fn create_product(
     pool: &PgPool,
 ) -> Result<Product, Box<dyn Error>> {
     queries::insert_product(new_product, pool).await
+}
+
+pub async fn edit_product(
+    edit_product: &EditProduct,
+    pool: &PgPool,
+) -> Result<Product, Box<dyn Error>> {
+    queries::edit_product(edit_product, pool).await
 }
 
 pub async fn delete_product(product: &DeleteProduct, pool: &PgPool) -> Result<(), Box<dyn Error>> {

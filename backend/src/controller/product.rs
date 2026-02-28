@@ -8,7 +8,7 @@ use serde::Deserialize;
 use sqlx::PgPool;
 
 use crate::{
-    models::{CreateProduct, DeleteProduct, Product},
+    models::{CreateProduct, DeleteProduct, EditProduct, Product},
     service,
 };
 
@@ -21,7 +21,10 @@ pub fn router() -> Router<PgPool> {
     Router::new()
         .route(
             "/",
-            get(list_products).post(new_product).delete(delete_product),
+            get(list_products)
+                .post(new_product)
+                .delete(delete_product)
+                .put(edit_product),
         )
         .route("/with-barcode", get(list_with_barcode))
         .route("/with-barcode/{product_id}", get(get_by_id_with_barcode))
@@ -43,6 +46,16 @@ async fn new_product(
     service::product::create_product(&new_product, &pool)
         .await
         .map(|product| (StatusCode::CREATED, Json(product)))
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
+}
+
+async fn edit_product(
+    State(pool): State<PgPool>,
+    Json(edit_product): Json<EditProduct>,
+) -> Result<Json<Product>, (StatusCode, String)> {
+    service::product::edit_product(&edit_product, &pool)
+        .await
+        .map(Json)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
 }
 

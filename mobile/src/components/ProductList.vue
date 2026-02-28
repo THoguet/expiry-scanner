@@ -3,36 +3,40 @@
 		<div v-if="loading" class="status-text">Loading products...</div>
 		<div v-else-if="error" class="status-text">{{ error }}</div>
 		<div v-else class="inner-fridge">
-			<ProductBox v-for="product in products" :product="product" @productDeleted="loadProducts" />
+			<ProductBox v-for="product in products" :product="product"
+				@deleteProductRequested="onDeleteProductRequested" @editProduct="openEditPanel(product)" />
 			<div v-if="products.length === 0" class="status-text">
 				<p>Your fridge is empty! Add some products to get started.</p>
 			</div>
+			<EditProduct v-if="productToEdit" :product="productToEdit" @closeEditProductPanel="closeEditProductPanel" />
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { getProductsWithBarcode, ProductWithBarcode } from '../services/backend';
+import { ProductWithBarcode } from '../services/backend';
+import { removeProduct, useProducts } from '../services/products';
 import ProductBox from './ProductBox.vue';
-import { CLIENT_ID } from '../main';
+import EditProduct from './EditProduct.vue';
 
-const products = ref<ProductWithBarcode[]>([]);
-const loading = ref(false);
-const error = ref<string | null>(null);
+const { products, loading, error, loadProducts, refreshProducts } = useProducts();
 
-async function loadProducts() {
-	loading.value = true;
-	error.value = null;
+const productToEdit = ref<ProductWithBarcode | null>(null);
 
-	try {
-		products.value = await getProductsWithBarcode(CLIENT_ID);
-	} catch (backendError) {
-		console.error(backendError);
-		error.value = "Failed to load products";
-	} finally {
-		loading.value = false;
-	}
+function openEditPanel(product: ProductWithBarcode) {
+	productToEdit.value = product;
+}
+
+
+async function onDeleteProductRequested(product: ProductWithBarcode[0]) {
+	await removeProduct({ id: product.id, client_id: product.client_id });
+	await refreshProducts();
+}
+
+async function closeEditProductPanel() {
+	productToEdit.value = null;
+	await refreshProducts();
 }
 
 onMounted(loadProducts);

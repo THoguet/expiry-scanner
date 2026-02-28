@@ -6,7 +6,15 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from "vue";
 import Footer from "./components/Footer.vue";
+import { updateNotifications } from "./services/notifications";
+import { useProducts } from "./services/products";
+
+onMounted(async () => {
+	await useProducts().loadProducts();
+	updateNotifications(useProducts().products.value);
+});
 
 </script>
 
