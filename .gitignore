@@ -1,3 +1,4 @@
 data/en.openfoodfacts.org.products.csv
 mobile/release-key.jks
 mobile/release-key-base64.txt
+mobile/src-tauri/gen/android/keystore.properties
