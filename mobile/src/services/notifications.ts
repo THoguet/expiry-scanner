@@ -95,7 +95,7 @@ function createNotificationForProduct(product: ProductWithBarcode, notifications
 	return reminders.map((reminder, index) => {
 		const notificationDate = new Date(expiryDate);
 		notificationDate.setDate(expiryDate.getDate() - reminder.daysBeforeExpiry);
-		notificationDate.setHours(13, 59, 0, 0);
+		notificationDate.setHours(9, 0, 0, 0);
 
 		return {
 			id: notificationsId[index],
