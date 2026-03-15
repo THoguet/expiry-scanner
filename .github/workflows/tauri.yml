@@ -70,7 +70,6 @@ jobs:
           - platform: macos-latest
             mobile: ios
             rust-targets: aarch64-apple-ios,aarch64-apple-ios-sim
-            args: "--target aarch64-apple-ios-sim"
 
     runs-on: ${{ matrix.platform }}
     steps:
