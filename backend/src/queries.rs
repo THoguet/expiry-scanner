@@ -3,7 +3,7 @@ use std::error::Error;
 use sqlx::types::Json;
 use sqlx::PgPool;
 
-use crate::models::{Barcode, CreateProduct, DeleteProduct, Product};
+use crate::models::{Barcode, CreateProduct, DeleteProduct, EditProduct, Product};
 
 #[derive(sqlx::FromRow)]
 struct ProductWithOptionalBarcodeRow {
@@ -93,4 +93,21 @@ pub async fn get_product_by_id_with_barcode(
         .await?;
 
     Ok(row.into_tuple())
+}
+
+pub async fn edit_product(
+    edit_product: &EditProduct,
+    pool: &PgPool,
+) -> Result<Product, Box<dyn Error>> {
+    let query = "update products set expiration_date=$1, barcode=$2 where id=$3 and client_id=$4 returning *";
+
+    let product = sqlx::query_as::<_, Product>(query)
+        .bind(&edit_product.expiration_date)
+        .bind(&edit_product.barcode)
+        .bind(&edit_product.id)
+        .bind(&edit_product.client_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(product)
 }

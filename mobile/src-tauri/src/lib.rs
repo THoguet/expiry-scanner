@@ -23,7 +23,10 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![greet, calculate_days_left]);
 
     #[cfg(any(target_os = "android", target_os = "ios"))]
-    let builder = builder.plugin(tauri_plugin_barcode_scanner::init());
+    let builder = builder
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_barcode_scanner::init())
+        .plugin(tauri_plugin_haptics::init());
 
     builder
         .run(tauri::generate_context!())

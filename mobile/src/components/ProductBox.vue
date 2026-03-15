@@ -1,6 +1,6 @@
 <template>
 	<div class="box" :style="`background-image: url('${getImageUrl()}')`" @pointerdown.stop="startTimerToDelete"
-		@pointerup="clearTimerToDelete" @pointercancel="clearTimerToDelete">
+		@pointerup="openEditPanel()" @pointercancel="clearTimerToDelete">
 		<div class="text-background">
 			<p>{{ getName() }}</p>
 			<div style="display: flex; align-items: center; gap: 0.5rem">
@@ -16,18 +16,19 @@ import { faCalendar } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { invoke } from '@tauri-apps/api/core';
 import { computed, onMounted, Ref, ref, watch } from 'vue';
-import { deleteProduct, ProductWithBarcode } from '../services/backend';
-import { emit } from '@tauri-apps/api/event';
+import { ProductWithBarcode } from '../services/backend';
 import { Product } from '../bindings/Product';
 import { Barcode } from '../bindings/Barcode';
+import { vibrate } from '@tauri-apps/plugin-haptics';
 
 
 const props = defineProps<{
 	product: ProductWithBarcode;
 }>()
 
-defineEmits<{
-	(productDeleted: number): void;
+const emitEvent = defineEmits<{
+	deleteProductRequested: [product: Product];
+	editProduct: [id: bigint];
 }>();
 
 let pro: Ref<Product> = ref(props.product[0]);
@@ -51,6 +52,8 @@ const daysLeft = ref<number | null>(null);
 const isLoadingDaysLeft = ref(true);
 const daysLeftError = ref(false);
 
+const TIME_TO_DELETE_MS = 2000;
+
 function getName(): string {
 	if (barcode.value && barcode.value.product_name) return barcode.value.product_name;
 	return "Unknown product; ID: " + pro.value.barcode;
@@ -72,7 +75,6 @@ function formatDate(dateString: string): string {
 
 async function getLeftDays(expirationDate: string): Promise<number> {
 	const days = await invoke("calculate_days_left", { expiryDate: expirationDate, format: "%Y-%m-%d" });
-	console.log(days);
 	return days as number;
 }
 
@@ -97,25 +99,82 @@ async function refreshDaysLeft(): Promise<void> {
 }
 
 let deleteTimer: number | null = null;
+let cancelVibration: (() => void) | null = null;
+
+function startVibrationSequence(durationMs: number, pulseCount: number = 10): () => void {
+	const startInterval = 100;
+	const endInterval = 10;
+	const timeoutIds: number[] = [];
+	const intervals: number[] = [];
+	let totalInterval = 0;
+
+	for (let i = 0; i < pulseCount; i++) {
+		const t = pulseCount === 1 ? 1 : i / (pulseCount - 1);
+		const eased = t * t;
+		const interval = startInterval * Math.pow(endInterval / startInterval, eased);
+		intervals.push(interval);
+		totalInterval += interval;
+	}
+
+	let elapsed = 0;
+
+	for (let i = 0; i < intervals.length; i++) {
+		const interval = intervals[i];
+		const delay = totalInterval === 0 ? 0 : Math.round((elapsed / totalInterval) * durationMs);
+		const vibrationTimes = Math.max(8, Math.round((interval / totalInterval) * durationMs * 0.7));
+
+		const timeoutId = window.setTimeout(() => {
+			vibrate(vibrationTimes);
+		}, delay);
+
+		timeoutIds.push(timeoutId);
+
+		elapsed += interval;
+	}
+
+	return () => {
+		for (const timeoutId of timeoutIds) {
+			clearTimeout(timeoutId);
+		}
+	};
+}
 
 function startTimerToDelete() {
+	if (cancelVibration !== null) {
+		cancelVibration();
+		cancelVibration = null;
+	}
+	cancelVibration = startVibrationSequence(TIME_TO_DELETE_MS);
 	console.log("Start timer to delete product with id:", pro.value.id);
 	deleteTimer = window.setTimeout(() => {
-		deleteProduct({ id: pro.value.id, client_id: pro.value.client_id })
-			.then(() => {
-				console.log("Product deleted successfully");
-				emit("productDeleted", pro.value.id);
-			})
-			.catch((error) => {
-				console.error("Error deleting product:", error);
-			});
-	}, 2000);
+		if (cancelVibration !== null) {
+			cancelVibration();
+			cancelVibration = null;
+		}
+		emitEvent('deleteProductRequested', pro.value);
+	}, TIME_TO_DELETE_MS);
+}
+
+function openEditPanel() {
+	if (deleteTimer !== null) {
+		clearTimeout(deleteTimer);
+		deleteTimer = null;
+	}
+	if (cancelVibration !== null) {
+		cancelVibration();
+		cancelVibration = null;
+	}
+	emitEvent('editProduct', pro.value.id);
 }
 
 function clearTimerToDelete() {
 	if (deleteTimer !== null) {
 		clearTimeout(deleteTimer);
 		deleteTimer = null;
+	}
+	if (cancelVibration !== null) {
+		cancelVibration();
+		cancelVibration = null;
 	}
 }
 

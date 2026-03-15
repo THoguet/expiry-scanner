@@ -24,6 +24,9 @@
 	"bundle": {
 		"active": true,
 		"targets": "all",
+		"iOS": {
+			"developmentTeam": "$APPLE_DEVELOPMENT_TEAM"
+		},
 		"icon": [
 			"icons/32x32.png",
 			"icons/128x128.png",

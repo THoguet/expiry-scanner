@@ -15,3 +15,13 @@ Set `VITE_BACKEND_URL` to your backend base URL (defaults to `http://127.0.0.1:3
 ```bash
 VITE_BACKEND_URL=http://192.168.1.12:3000 bun run dev
 ```
+
+## iOS signing (Tauri)
+
+iOS builds require an Apple Development Team ID.
+
+Set this environment variable before running `tauri ios build` (or in CI secrets/env):
+
+```bash
+export APPLE_DEVELOPMENT_TEAM=YOUR_TEAM_ID
+```

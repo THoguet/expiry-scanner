@@ -67,10 +67,9 @@ jobs:
             mobile: android
             rust-targets: aarch64-linux-android
             args: "--apk"
-          - platform: macos-latest
-            mobile: ios
-            rust-targets: aarch64-apple-ios,aarch64-apple-ios-sim
-            args: "--target aarch64-apple-ios-sim"
+          # - platform: macos-latest
+          #   mobile: ios
+          #   rust-targets: aarch64-apple-ios,aarch64-apple-ios-sim
 
     runs-on: ${{ matrix.platform }}
     steps:
