@@ -1,18 +1,20 @@
-import { cancel, Channel, channels, createChannel, Options, pending, PendingNotification, sendNotification } from "@tauri-apps/plugin-notification";
+import { cancel, isPermissionGranted, Options, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { Product } from "../bindings/Product";
 import { ProductWithBarcode } from "./backend";
 
-const channel: Channel = {
-	id: "expiry-scanner",
-	name: "Expiry Scanner",
-	description: "Notifications for expiring products",
-};
+const trackedPendingNotificationIds = new Set<number>();
 
-export async function initChannel() {
-	let actualChannels = await channels();
-	if (!actualChannels.some((c) => c.id === channel.id)) {
-		createChannel(channel);
+export function getTrackedPendingNotificationIds(): number[] {
+	return Array.from(trackedPendingNotificationIds);
+}
+
+export async function checkPermissions(): Promise<boolean> {
+	let permissionGranted = await isPermissionGranted();
+	if (!permissionGranted) {
+		const permission = await requestPermission();
+		permissionGranted = permission === 'granted';
 	}
+	return permissionGranted;
 }
 
 // Generate a unique notification ID for a product based on its barcode and expiry date for the three notifications: 3, 2, and 1 day before expiry
@@ -32,30 +34,46 @@ function hashString(str: string): number {
 }
 
 export async function updateNotifications(products: ProductWithBarcode[]) {
-	const actualNotifications: PendingNotification[] = await pending();
-	console.log("Actual pending notifications:", actualNotifications);
-	const actualNotificationIds = new Set(actualNotifications.map((n) => n.id));
-
 	const productsWithIds = new Map<ProductWithBarcode, number[]>(products.map((p) => [p, generateNotificationId(p[0])]));
 	const productsWithIdsSet = new Set<number>(Array.from(productsWithIds.values()).flat());
 
+	const notificationsToCancelIds = Array.from(trackedPendingNotificationIds).filter((id) => !productsWithIdsSet.has(id));
+	if (notificationsToCancelIds.length > 0) {
+		await cancel(notificationsToCancelIds);
+	}
+	notificationsToCancelIds.forEach((id) => trackedPendingNotificationIds.delete(id));
 
-	const notificationsToCancelIds = actualNotifications.filter((n) => !productsWithIdsSet.has(n.id)).map((n) => n.id);
-	cancel(notificationsToCancelIds)
+	const hasPermission = await checkPermissions();
+	if (!hasPermission) {
+		return;
+	}
 
-	const notificationsToCreate = products.filter((p) => productsWithIds.get(p)!.some((id) => !actualNotificationIds.has(id)));
+	const notificationsToCreate = products.filter((p) => productsWithIds.get(p)!.some((id) => !trackedPendingNotificationIds.has(id)));
 	for (const product of notificationsToCreate) {
 		const notificationOptions = createNotificationForProduct(product, productsWithIds.get(product));
 		for (const notificationOption of notificationOptions) {
 			sendNotification(notificationOption);
+			if (notificationOption.id !== undefined) {
+				trackedPendingNotificationIds.add(notificationOption.id);
+			}
 		}
 	}
+	console.log("tracked pending notification ids:", getTrackedPendingNotificationIds());
+}
+
+export async function cancelNotificationsForProduct(product: Product): Promise<void> {
+	const notificationIds = generateNotificationId(product);
+	await cancel(notificationIds);
+	notificationIds.forEach((id) => trackedPendingNotificationIds.delete(id));
 }
 
 export async function addNewProductNotification(product: ProductWithBarcode) {
 	const notificationOptions = createNotificationForProduct(product);
 	for (const notificationOption of notificationOptions) {
 		sendNotification(notificationOption);
+		if (notificationOption.id !== undefined) {
+			trackedPendingNotificationIds.add(notificationOption.id);
+		}
 	}
 }
 
@@ -77,12 +95,13 @@ function createNotificationForProduct(product: ProductWithBarcode, notifications
 	return reminders.map((reminder, index) => {
 		const notificationDate = new Date(expiryDate);
 		notificationDate.setDate(expiryDate.getDate() - reminder.daysBeforeExpiry);
-		notificationDate.setHours(9, 0, 0, 0);
+		notificationDate.setHours(13, 59, 0, 0);
 
 		return {
 			id: notificationsId[index],
 			title,
 			body: reminder.message,
+			largeBody: reminder.message,
 			schedule: {
 				at: {
 					date: notificationDate,

@@ -1,11 +1,17 @@
 import { ref } from "vue";
-import { createProduct, deleteProduct, editProduct, getProductsWithBarcode, ProductWithBarcode } from "./backend";
+import {
+	createProduct,
+	deleteProduct,
+	editProduct,
+	getProductsWithBarcode,
+	ProductWithBarcode,
+} from "./backend";
 import { CLIENT_ID } from "../main";
 import type { CreateProduct } from "../bindings/CreateProduct";
 import type { DeleteProduct } from "../bindings/DeleteProduct";
 import type { Product } from "../bindings/Product";
 import { EditProduct } from "../bindings/EditProduct";
-import { updateNotifications } from "./notifications";
+import { cancelNotificationsForProduct, updateNotifications } from "./notifications";
 
 const CACHE_TTL_MS = 60_000;
 
@@ -15,13 +21,23 @@ type ProductsCacheEntry = {
 };
 
 const cacheByClientId = new Map<string, ProductsCacheEntry>();
-const inFlightRequestsByClientId = new Map<string, Promise<ProductWithBarcode[]>>();
+const inFlightRequestsByClientId = new Map<
+	string,
+	Promise<ProductWithBarcode[]>
+>();
+
+const products = ref<ProductWithBarcode[]>([]);
+const loading = ref(false);
+const error = ref<string | null>(null);
 
 function isCacheFresh(cacheEntry: ProductsCacheEntry): boolean {
 	return Date.now() - cacheEntry.cachedAt < CACHE_TTL_MS;
 }
 
-async function getProductsWithBarcodeCached(clientId: string, forceRefresh: boolean = false): Promise<ProductWithBarcode[]> {
+async function getProductsWithBarcodeCached(
+	clientId: string,
+	forceRefresh: boolean = false,
+): Promise<ProductWithBarcode[]> {
 	if (!forceRefresh) {
 		const cached = cacheByClientId.get(clientId);
 		if (cached && isCacheFresh(cached)) {
@@ -69,12 +85,22 @@ export async function addProduct(payload: CreateProduct): Promise<Product> {
 }
 
 export async function removeProduct(payload: DeleteProduct): Promise<void> {
+	const productToRemove = useProducts().products.value.find(
+		([product]) => product.id === payload.id && product.client_id === payload.client_id,
+	)?.[0];
+
+	if (productToRemove) {
+		await cancelNotificationsForProduct(productToRemove);
+	}
+
 	await deleteProduct(payload);
 	await useProducts().refreshProducts();
 	updateNotifications(useProducts().products.value);
 }
 
-export async function saveEditedProduct(payload: EditProduct): Promise<Product> {
+export async function saveEditedProduct(
+	payload: EditProduct,
+): Promise<Product> {
 	const updatedProduct = await editProduct(payload);
 	await useProducts().refreshProducts();
 	updateNotifications(useProducts().products.value);
@@ -82,16 +108,15 @@ export async function saveEditedProduct(payload: EditProduct): Promise<Product> 
 }
 
 export function useProducts(clientId: string = CLIENT_ID) {
-	const products = ref<ProductWithBarcode[]>([]);
-	const loading = ref(false);
-	const error = ref<string | null>(null);
-
 	async function loadProducts(forceRefresh: boolean = false): Promise<void> {
 		loading.value = true;
 		error.value = null;
 
 		try {
-			products.value = await getProductsWithBarcodeCached(clientId, forceRefresh);
+			products.value = await getProductsWithBarcodeCached(
+				clientId,
+				forceRefresh,
+			);
 		} catch (backendError) {
 			console.error(backendError);
 			error.value = "Failed to load products";

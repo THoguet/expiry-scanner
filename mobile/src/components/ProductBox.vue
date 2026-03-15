@@ -75,7 +75,6 @@ function formatDate(dateString: string): string {
 
 async function getLeftDays(expirationDate: string): Promise<number> {
 	const days = await invoke("calculate_days_left", { expiryDate: expirationDate, format: "%Y-%m-%d" });
-	console.log(days);
 	return days as number;
 }
 

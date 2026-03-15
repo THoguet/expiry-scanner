@@ -3,7 +3,7 @@
 		<div v-if="loading" class="status-text">Loading products...</div>
 		<div v-else-if="error" class="status-text">{{ error }}</div>
 		<div v-else class="inner-fridge">
-			<ProductBox v-for="product in products" :product="product"
+			<ProductBox v-for="product in products" :key="product[0].id.toString()" :product="product"
 				@deleteProductRequested="onDeleteProductRequested" @editProduct="openEditPanel(product)" />
 			<div v-if="products.length === 0" class="status-text">
 				<p>Your fridge is empty! Add some products to get started.</p>
@@ -31,7 +31,6 @@ function openEditPanel(product: ProductWithBarcode) {
 
 async function onDeleteProductRequested(product: ProductWithBarcode[0]) {
 	await removeProduct({ id: product.id, client_id: product.client_id });
-	await refreshProducts();
 }
 
 async function closeEditProductPanel() {
