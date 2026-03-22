@@ -61,3 +61,7 @@ POST http://localhost:3000/products/image/5055950623132/8?client_id=a3057b80-46d
 Content-Type: image/jpeg
 
 < ./test-assets/sample.jpg
+
+###
+
+GET http://localhost:3000/product_image/9782373091762/18.jpg

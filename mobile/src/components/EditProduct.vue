@@ -91,7 +91,7 @@ const editedProduct = ref<EditProductType>({
 	name: props.product[0].name,
 	image: props.product[0].image,
 	expiration_date: props.product[0].expiration_date,
-	client_id: props.product[0].client_id,
+	client_id: CLIENT_ID,
 });
 
 function onNameInput() {

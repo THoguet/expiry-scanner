@@ -31,6 +31,7 @@ pub async fn list_products_with_client_id(
 pub async fn create_product(
     new_product: &CreateProduct,
     pool: &PgPool,
+    request_base_url: &str,
 ) -> Result<Product, Box<dyn Error>> {
     debug!(barcode = %new_product.barcode, client_id = %new_product.client_id, "service create_product called");
     if new_product.name.trim().is_empty() {
@@ -50,6 +51,7 @@ pub async fn create_product(
                 new_product.client_id.to_string(),
                 new_product.barcode.clone(),
                 product.id,
+                request_base_url,
                 decoded,
             )
             .await
@@ -201,6 +203,7 @@ pub async fn save_optimized_product_image(
     client_id: String,
     barcode: String,
     product_id: i64,
+    request_base_url: &str,
     image_bytes: Vec<u8>,
 ) -> Result<String, (StatusCode, String)> {
     debug!(client_id = %client_id, barcode = %barcode, product_id, image_bytes = image_bytes.len(), "service save_optimized_product_image called");
@@ -248,10 +251,13 @@ pub async fn save_optimized_product_image(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     debug!(output_path = %output_path.display(), "optimized product image saved");
-    Ok(format!(
-        "/product_image/{}/{}.jpg",
-        safe_barcode, product_id
-    ))
+    let relative_path = format!("/product_image/{}/{}.jpg", safe_barcode, product_id);
+    let normalized_base = request_base_url.trim_end_matches('/');
+    if normalized_base.is_empty() {
+        Ok(relative_path)
+    } else {
+        Ok(format!("{}{}", normalized_base, relative_path))
+    }
 }
 
 fn sanitize_file_segment(value: &str) -> String {

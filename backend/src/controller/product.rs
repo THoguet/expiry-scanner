@@ -1,7 +1,7 @@
 use axum::{
     body::Bytes,
     extract::{DefaultBodyLimit, Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     routing::{get, post},
     Json, Router,
 };
@@ -52,6 +52,7 @@ async fn list_products(
 
 async fn new_product(
     State(pool): State<PgPool>,
+    headers: HeaderMap,
     Json(new_product): Json<CreateProduct>,
 ) -> Result<(StatusCode, Json<Product>), (StatusCode, String)> {
     debug!(barcode = %new_product.barcode, client_id = %new_product.client_id, "new_product called");
@@ -60,7 +61,9 @@ async fn new_product(
         return Err((StatusCode::BAD_REQUEST, "Invalid name".to_string()));
     }
 
-    service::product::create_product(&new_product, &pool)
+    let base_url = resolve_request_base_url(&headers);
+
+    service::product::create_product(&new_product, &pool, &base_url)
         .await
         .map(|product| (StatusCode::CREATED, Json(product)))
         .map_err(|e| {
@@ -152,18 +155,41 @@ async fn upload_product_image(
     State(pool): State<PgPool>,
     Path((barcode, product_id)): Path<(String, i64)>,
     Query(ProductQuery { client_id }): Query<ProductQuery>,
+    headers: HeaderMap,
     body: Bytes,
 ) -> Result<Json<UploadProductImageResponse>, (StatusCode, String)> {
     debug!(barcode = %barcode, product_id, client_id = %client_id, image_bytes = body.len(), "upload_product_image called");
+    let base_url = resolve_request_base_url(&headers);
     let image = service::product::save_optimized_product_image(
         &pool,
         client_id,
         barcode,
         product_id,
+        &base_url,
         body.to_vec(),
     )
     .await?;
 
     debug!(image_path = %image, "upload_product_image succeeded");
     Ok(Json(UploadProductImageResponse { image }))
+}
+
+fn resolve_request_base_url(headers: &HeaderMap) -> String {
+    let host = header_value(headers, "x-forwarded-host").or_else(|| header_value(headers, "host"));
+    let proto = header_value(headers, "x-forwarded-proto").unwrap_or_else(|| "http".to_string());
+
+    match host {
+        Some(value) if !value.is_empty() => format!("{}://{}", proto, value),
+        _ => String::new(),
+    }
+}
+
+fn header_value(headers: &HeaderMap, name: &str) -> Option<String> {
+    headers
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.split(',').next())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string())
 }

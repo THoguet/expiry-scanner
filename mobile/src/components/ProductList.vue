@@ -17,6 +17,7 @@
 import { onMounted, ref } from 'vue';
 import { ProductWithBarcode } from '../services/backend';
 import { removeProduct, useProducts } from '../services/products';
+import { CLIENT_ID } from '../main';
 import ProductBox from './ProductBox.vue';
 import EditProduct from './EditProduct.vue';
 
@@ -30,7 +31,7 @@ function openEditPanel(product: ProductWithBarcode) {
 
 
 async function onDeleteProductRequested(product: ProductWithBarcode[0]) {
-	await removeProduct({ id: product.id, client_id: product.client_id });
+	await removeProduct({ id: product.id, client_id: CLIENT_ID });
 }
 
 async function closeEditProductPanel() {
