@@ -5,16 +5,21 @@ import type { Barcode } from "../bindings/Barcode";
 import { EditProduct } from "../bindings/EditProduct";
 import type { ProductPrefill } from "../bindings/ProductPrefill";
 import type { UploadProductImageResponse } from "../bindings/UploadProductImageResponse";
+import type { Stock } from "../bindings/Stock";
+import type { CreateStock } from "../bindings/CreateStock";
+import type { EditStock } from "../bindings/EditStock";
+import type { DeleteStock } from "../bindings/DeleteStock";
+import type { AdjustStockDelta } from "../bindings/AdjustStockDelta";
 
-const DEFAULT_BACKEND_URL = "http://192.168.1.22:3000";
+const DEFAULT_BACKEND_URL = "https://expiry.nessar.fr";
 
 function getBaseUrl(): string {
-	const configuredUrl = null;
-	// if (!configuredUrl) {
-	return DEFAULT_BACKEND_URL;
-	// }
+	const configuredUrl = import.meta.env.VITE_BACKEND_URL?.trim();
+	if (!configuredUrl) {
+		return DEFAULT_BACKEND_URL;
+	}
 
-	// return configuredUrl.replace(/\/$/, "");
+	return configuredUrl.replace(/\/$/, "");
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T | undefined> {
@@ -125,4 +130,56 @@ export async function uploadProductImage(
 
 	const result = (await response.json()) as UploadProductImageResponse;
 	return result;
+}
+
+export async function getStocks(clientId: string): Promise<Stock[]> {
+	const stocks = await request<Stock[]>(`/stock?client_id=${encodeURIComponent(clientId)}`);
+	if (!stocks) return [];
+	return stocks;
+}
+
+export async function createStock(payload: CreateStock): Promise<Stock> {
+	const created = await request<Stock>("/stock", {
+		method: "POST",
+		body: JSON.stringify(payload),
+	});
+
+	if (!created) {
+		throw new Error("Failed to create stock");
+	}
+
+	return created;
+}
+
+export async function editStock(payload: EditStock): Promise<Stock> {
+	const updated = await request<Stock>("/stock", {
+		method: "PUT",
+		body: JSON.stringify(payload),
+	});
+
+	if (!updated) {
+		throw new Error("Failed to edit stock");
+	}
+
+	return updated;
+}
+
+export async function deleteStock(payload: DeleteStock): Promise<void> {
+	await request<void>("/stock", {
+		method: "DELETE",
+		body: JSON.stringify(payload),
+	});
+}
+
+export async function adjustStockByDelta(stockId: Stock["id"], payload: AdjustStockDelta): Promise<Stock> {
+	const updated = await request<Stock>(`/stock/${encodeURIComponent(stockId.toString())}/delta`, {
+		method: "POST",
+		body: JSON.stringify(payload),
+	});
+
+	if (!updated) {
+		throw new Error("Failed to adjust stock");
+	}
+
+	return updated;
 }

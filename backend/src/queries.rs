@@ -5,8 +5,8 @@ use sqlx::PgPool;
 use tracing::debug;
 
 use crate::models::{
-    Barcode, BarcodePrefill, CreateProduct, CreateUserProductInfo, DeleteProduct, EditProduct,
-    Product, UserProductInfo,
+    Barcode, BarcodePrefill, CreateProduct, CreateStock, CreateUserProductInfo, DeleteProduct,
+    DeleteStock, EditProduct, EditStock, Product, Stock, UserProductInfo,
 };
 
 #[derive(sqlx::FromRow)]
@@ -229,4 +229,86 @@ pub async fn set_product_image(
         .await?;
 
     Ok(product)
+}
+
+pub async fn insert_stock(new_stock: &CreateStock, pool: &PgPool) -> Result<Stock, Box<dyn Error>> {
+    debug!(client_id = %new_stock.client_id, "query insert_stock called");
+    let query = "insert into stock (name, desired_quantity, current_quantity, unit, location, client_id) values ($1, $2, $3, $4, $5, $6) returning *";
+
+    let stock = sqlx::query_as::<_, Stock>(query)
+        .bind(&new_stock.name)
+        .bind(new_stock.desired_quantity)
+        .bind(new_stock.current_quantity)
+        .bind(&new_stock.unit)
+        .bind(&new_stock.location)
+        .bind(new_stock.client_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(stock)
+}
+
+pub async fn list_stock_with_client_id(
+    pool: &PgPool,
+    client_id: uuid::Uuid,
+) -> Result<Vec<Stock>, Box<dyn Error>> {
+    debug!(client_id = %client_id, "query list_stock_with_client_id called");
+    let query = "select * from stock where client_id=$1 order by updated_at desc";
+
+    let stock = sqlx::query_as::<_, Stock>(query)
+        .bind(client_id)
+        .fetch_all(pool)
+        .await?;
+
+    Ok(stock)
+}
+
+pub async fn edit_stock(edit_stock: &EditStock, pool: &PgPool) -> Result<Stock, Box<dyn Error>> {
+    debug!(stock_id = edit_stock.id, client_id = %edit_stock.client_id, "query edit_stock called");
+    let query = "update stock set name=$1, desired_quantity=$2, current_quantity=$3, unit=$4, location=$5, updated_at=now() where id=$6 and client_id=$7 returning *";
+
+    let stock = sqlx::query_as::<_, Stock>(query)
+        .bind(&edit_stock.name)
+        .bind(edit_stock.desired_quantity)
+        .bind(edit_stock.current_quantity)
+        .bind(&edit_stock.unit)
+        .bind(&edit_stock.location)
+        .bind(edit_stock.id)
+        .bind(edit_stock.client_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(stock)
+}
+
+pub async fn delete_stock(delete_stock: &DeleteStock, pool: &PgPool) -> Result<(), Box<dyn Error>> {
+    debug!(stock_id = delete_stock.id, client_id = %delete_stock.client_id, "query delete_stock called");
+    let query = "delete from stock where id=$1 and client_id=$2";
+
+    sqlx::query(query)
+        .bind(delete_stock.id)
+        .bind(delete_stock.client_id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn adjust_stock_delta(
+    pool: &PgPool,
+    stock_id: i64,
+    client_id: uuid::Uuid,
+    delta: i32,
+) -> Result<Option<Stock>, Box<dyn Error>> {
+    debug!(stock_id, client_id = %client_id, delta, "query adjust_stock_delta called");
+    let query = "update stock set current_quantity = current_quantity + $1, updated_at=now() where id=$2 and client_id=$3 and current_quantity + $1 >= 0 returning *";
+
+    let stock = sqlx::query_as::<_, Stock>(query)
+        .bind(delta)
+        .bind(stock_id)
+        .bind(client_id)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(stock)
 }

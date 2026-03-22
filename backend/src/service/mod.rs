@@ -5,6 +5,7 @@ use tracing::debug;
 
 pub mod barcode;
 pub mod product;
+pub mod stock;
 
 pub async fn db_check(pool: &PgPool) -> Result<(), Box<dyn Error>> {
     debug!("service db_check started");

@@ -20,6 +20,61 @@ pub struct Product {
     pub client_id: Uuid,
 }
 
+#[derive(Serialize, FromRow, TS, Debug)]
+#[ts(export)]
+#[allow(dead_code)]
+pub struct Stock {
+    pub id: i64,
+    pub name: String,
+    pub desired_quantity: i32,
+    pub current_quantity: i32,
+    pub unit: Option<String>,
+    pub location: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    #[allow(dead_code)]
+    #[serde(skip_serializing)]
+    #[ts(skip)]
+    pub client_id: Uuid,
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct CreateStock {
+    pub name: String,
+    pub desired_quantity: i32,
+    pub current_quantity: i32,
+    pub unit: Option<String>,
+    pub location: Option<String>,
+    pub client_id: Uuid,
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct EditStock {
+    pub id: i64,
+    pub name: String,
+    pub desired_quantity: i32,
+    pub current_quantity: i32,
+    pub unit: Option<String>,
+    pub location: Option<String>,
+    pub client_id: Uuid,
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct DeleteStock {
+    pub id: i64,
+    pub client_id: Uuid,
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct AdjustStockDelta {
+    pub client_id: Uuid,
+    pub delta: i32,
+}
+
 #[derive(Deserialize, TS)]
 #[ts(export)]
 pub struct CreateProduct {

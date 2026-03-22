@@ -6,6 +6,7 @@ use crate::service;
 
 pub mod barcode;
 pub mod product;
+pub mod stock;
 
 pub fn router(pool: PgPool) -> Router {
     debug!("building root router");
@@ -13,6 +14,7 @@ pub fn router(pool: PgPool) -> Router {
         .route("/health", get(health_check))
         .route("/db_check", get(db_check))
         .nest("/products", product::router())
+        .nest("/stock", stock::router())
         .nest("/barcodes", barcode::router())
         .with_state(pool)
 }
