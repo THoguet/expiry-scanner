@@ -3,6 +3,7 @@
 		<form class="form-card" :class="{ 'scan-active': scanning }" @submit.prevent="createNewProduct">
 			<h2 class="title">Add Product</h2>
 
+			<!-- Barcode Input -->
 			<div class="field-group">
 				<label for="productBarCode">Product Barcode</label>
 				<div class="barcode-row">
@@ -15,7 +16,71 @@
 				</div>
 			</div>
 
-			<div class="field-group">
+			<!-- Prefill Section (shown after barcode is scanned) -->
+			<div v-if="prefilled" class="prefill-section">
+				<div class="prefill-header">
+					<h3>Product Information</h3>
+					<span class="prefill-source" :title="`Source: ${prefilled.source}`">
+						{{ getSourceLabel(prefilled.source) }}
+					</span>
+				</div>
+
+				<!-- Prefilled Image Preview -->
+				<div v-if="prefilled.image" class="prefill-image-preview">
+					<img :src="prefilled.image" :alt="prefilled.name || 'Product image'" />
+				</div>
+
+				<!-- Name Input (pre-populated from prefill) -->
+				<div class="field-group">
+					<label for="productName">Product Name *</label>
+					<input type="text" id="productName" v-model="productInfo.name" placeholder="Product name"
+						ref="productNameInput" @input="onNameInput" />
+					<span v-if="showNameError" class="field-error">Product name is required</span>
+				</div>
+			</div>
+
+			<!-- Name Input (if no prefill) -->
+			<div v-else-if="productInfo.barCode && !prefilling" class="field-group">
+				<label for="productName">Product Name *</label>
+				<input type="text" id="productName" v-model="productInfo.name" placeholder="Enter product name"
+					ref="productNameInput" @input="onNameInput" />
+				<span v-if="showNameError" class="field-error">Product name is required</span>
+			</div>
+
+			<!-- Loading indicator for prefill -->
+			<div v-if="prefilling" class="loading-indicator">
+				<p>Looking up product information...</p>
+			</div>
+
+			<!-- Image Upload Section -->
+			<div v-if="productInfo.barCode && productInfo.name" class="field-group">
+				<label>Product Image (optional)</label>
+				<div class="camera-capture-area">
+					<div v-if="imagePreview" class="image-preview">
+						<img :src="imagePreview" :alt="productInfo.name" />
+						<div class="image-preview-actions">
+							<button type="button" class="upload-btn" @click="clearImage">Remove</button>
+							<button type="button" class="upload-btn" @click="retakeImage">Retake</button>
+						</div>
+					</div>
+					<div v-else>
+						<div class="image-placeholder">
+							<p class="upload-hint">Open your device camera to take a picture</p>
+						</div>
+						<div class="camera-controls">
+							<button type="button" class="scan-btn" @click="openSystemCamera">
+								Use Device Camera
+							</button>
+						</div>
+						<input ref="cameraCaptureInput" type="file" accept="image/*" capture="environment"
+							class="hidden-capture-input" @change="onSystemCameraImageSelected" />
+					</div>
+				</div>
+				<span v-if="imageUploadError" class="field-error">{{ imageUploadError }}</span>
+			</div>
+
+			<!-- Expiry Date -->
+			<div v-if="productInfo.name" class="field-group">
 				<label for="expiryDay">Expiry Date <h6 style="display: inline-flex; align-items: center; gap: 0.25rem;">
 						<FontAwesomeIcon :icon="faQuestionCircle" />
 						If you want to modify the year do it first
@@ -33,8 +98,11 @@
 				</div>
 			</div>
 
-			<button type="submit" :class="addError ? 'submit-btn error-btn' : 'submit-btn'">{{ addError ?? 'Add Product'
-			}}</button>
+			<!-- Submit Button -->
+			<button type="submit" :class="{ 'submit-btn': true, 'error-btn': !!addError, 'loading': isSubmitting }"
+				:disabled="isSubmitting">
+				{{ isSubmitting ? 'Creating...' : (addError ?? 'Add Product') }}
+			</button>
 		</form>
 	</section>
 </template>
@@ -45,13 +113,17 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { emit } from '@tauri-apps/api/event';
 import { checkPermissions, scan, requestPermissions, Format, cancel } from '@tauri-apps/plugin-barcode-scanner';
 import { onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue';
-import { addProduct } from '../services/products';
+import { addProduct, useProducts } from '../services/products';
 import { CLIENT_ID } from '../main';
+import type { ProductPrefill } from '../bindings/ProductPrefill';
 
 let scanning = ref(false);
+let prefilling = ref(false);
+let isSubmitting = ref(false);
 
 interface ProductInfo {
 	barCode: string;
+	name: string;
 	expiryDay: string | null;
 	expiryMonth: string | null;
 	expiryYear: string | null;
@@ -59,19 +131,27 @@ interface ProductInfo {
 
 let productInfo = ref<ProductInfo>({
 	barCode: '',
+	name: '',
 	expiryDay: null,
 	expiryMonth: null,
 	expiryYear: String(new Date().getFullYear() % 100),
 });
 
+let prefilled = ref<ProductPrefill | null>(null);
 let scanError = ref<string | null>(null);
 let addError = ref<string | null>(null);
+let imageUploadError = ref<string | null>(null);
+let showNameError = ref(false);
+
+let selectedImage = ref<File | null>(null);
+let imagePreview = ref<string | null>(null);
 
 const productBarCodeInput = ref<HTMLInputElement | null>(null);
-
+const productNameInput = ref<HTMLInputElement | null>(null);
 const expiryDayInput = ref<HTMLInputElement | null>(null);
 const expiryMonthInput = ref<HTMLInputElement | null>(null);
 const expiryYearInput = ref<HTMLInputElement | null>(null);
+const cameraCaptureInput = ref<HTMLInputElement | null>(null);
 
 const inputOrder = [productBarCodeInput, expiryDayInput, expiryMonthInput];
 
@@ -134,6 +214,7 @@ function isYearValid(year: string | null): boolean {
 
 function blurAllInputs() {
 	productBarCodeInput.value?.blur();
+	productNameInput.value?.blur();
 	expiryDayInput.value?.blur();
 	expiryMonthInput.value?.blur();
 	expiryYearInput.value?.blur();
@@ -155,30 +236,53 @@ function goToNext(event: Event, forceNext = false) {
 	}
 }
 
-function createNewProduct() {
+async function createNewProduct() {
 	const verificationResult = verifyProductInfo();
 	if (verificationResult !== true) {
 		console.warn("Product info is not valid:", verificationResult);
 		setAddError(verificationResult as string);
 		return;
 	}
-	addProduct({
-		barcode: productInfo.value.barCode,
-		expiration_date: `${'20' + productInfo.value.expiryYear}-${String(productInfo.value.expiryMonth).padStart(2, '0')}-${String(productInfo.value.expiryDay).padStart(2, '0')}`,
-		client_id: CLIENT_ID,
-	}).then(() => {
+
+	isSubmitting.value = true;
+	try {
+		const imageBase64 = selectedImage.value
+			? await toBase64Payload(selectedImage.value)
+			: null;
+
+		await addProduct({
+			barcode: productInfo.value.barCode,
+			name: productInfo.value.name,
+			image: null,
+			image_base64: imageBase64,
+			expiration_date: `${'20' + productInfo.value.expiryYear}-${String(productInfo.value.expiryMonth).padStart(2, '0')}-${String(productInfo.value.expiryDay).padStart(2, '0')}`,
+			client_id: CLIENT_ID,
+		});
+
 		emit("productAdded");
-		productInfo.value = {
-			barCode: '',
-			expiryDay: null,
-			expiryMonth: null,
-			expiryYear: String(new Date().getFullYear() % 100),
-		};
+		resetForm();
 		inputOrder[0].value?.focus();
-	}).catch((error) => {
+	} catch (error) {
 		console.error("Error creating product:", error);
 		setAddError("Failed to add product");
-	});
+	} finally {
+		isSubmitting.value = false;
+	}
+}
+
+function resetForm() {
+	productInfo.value = {
+		barCode: '',
+		name: '',
+		expiryDay: null,
+		expiryMonth: null,
+		expiryYear: String(new Date().getFullYear() % 100),
+	};
+	prefilled.value = null;
+	selectedImage.value = null;
+	imagePreview.value = null;
+	showNameError.value = false;
+	imageUploadError.value = null;
 }
 
 function setAddError(message: string) {
@@ -191,6 +295,9 @@ function setAddError(message: string) {
 function verifyProductInfo(): string | boolean {
 	if (!productInfo.value.barCode) {
 		return "Barcode is required";
+	}
+	if (!productInfo.value.name || productInfo.value.name.trim() === '') {
+		return "Product name is required";
 	}
 	if (!productInfo.value.expiryDay || !productInfo.value.expiryMonth || !productInfo.value.expiryYear) {
 		return "All expiry fields are required";
@@ -207,8 +314,85 @@ function verifyProductInfo(): string | boolean {
 	return true;
 }
 
+function onNameInput() {
+	showNameError.value = false;
+	if (addError.value) {
+		addError.value = null;
+	}
+}
+
 function selectInput(inputRef: FocusEvent) {
 	(inputRef.target as HTMLInputElement).select();
+}
+
+
+function setImagePreview(file: File) {
+	const reader = new FileReader();
+	reader.onload = (e) => {
+		imagePreview.value = e.target?.result as string;
+	};
+	reader.readAsDataURL(file);
+}
+
+function toBase64Payload(file: File): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onload = () => {
+			const result = reader.result;
+			if (typeof result !== 'string') {
+				reject(new Error('Failed to read image'));
+				return;
+			}
+
+			const base64 = result.includes(',') ? result.split(',')[1] : result;
+			if (!base64) {
+				reject(new Error('Failed to encode image'));
+				return;
+			}
+
+			resolve(base64);
+		};
+		reader.onerror = () => reject(new Error('Failed to encode image'));
+		reader.readAsDataURL(file);
+	});
+}
+
+function openSystemCamera() {
+	imageUploadError.value = null;
+	cameraCaptureInput.value?.click();
+}
+
+function onSystemCameraImageSelected(event: Event) {
+	const target = event.target as HTMLInputElement;
+	const file = target.files?.[0];
+
+	if (!file) return;
+
+	const maxSizeBytes = 10 * 1024 * 1024;
+	if (file.size > maxSizeBytes) {
+		imageUploadError.value = 'Image must be smaller than 10MB';
+		setTimeout(() => {
+			imageUploadError.value = null;
+		}, 3000);
+		return;
+	}
+
+	selectedImage.value = file;
+	setImagePreview(file);
+
+	if (cameraCaptureInput.value) {
+		cameraCaptureInput.value.value = '';
+	}
+}
+
+async function retakeImage() {
+	clearImage();
+	openSystemCamera();
+}
+
+function clearImage() {
+	selectedImage.value = null;
+	imagePreview.value = null;
 }
 
 function cancelScan() {
@@ -243,8 +427,9 @@ async function startScan() {
 				scanError.value = 'Scanned code is in invalid format (' + result.format + ')';
 				return;
 			}
+
 			productInfo.value.barCode = result.content;
-			expiryDayInput.value?.focus();
+			await loadPrefill(result.content);
 			return;
 		}
 
@@ -252,6 +437,54 @@ async function startScan() {
 	} catch (error) {
 		console.error('Error checking permissions or scanning:', error);
 		scanError.value = 'Failed to scan barcode';
+	}
+}
+
+async function loadPrefill(barcode: string) {
+	prefilling.value = true;
+	try {
+		const { getPrefill } = useProducts(CLIENT_ID);
+		const prefillData = await getPrefill(barcode);
+		prefilled.value = prefillData;
+
+		// Auto-populate name if available
+		if (prefillData.name) {
+			productInfo.value.name = prefillData.name;
+		}
+
+		// Focus name input for confirmation/editing
+		setTimeout(() => {
+			productNameInput.value?.focus();
+		}, 100);
+	} catch (error) {
+		console.error('Prefill lookup failed:', error);
+		// Still allow user to enter name manually
+		prefilled.value = {
+			barcode,
+			name: null,
+			image: null,
+			source: 'none',
+		};
+		setTimeout(() => {
+			productNameInput.value?.focus();
+		}, 100);
+	} finally {
+		prefilling.value = false;
+	}
+}
+
+function getSourceLabel(source: string): string {
+	switch (source) {
+		case 'barcode_db':
+			return 'from database';
+		case 'user_product_info':
+			return 'saved';
+		case 'user_product_info_global':
+			return 'from others';
+		case 'none':
+			return 'no match';
+		default:
+			return source;
 	}
 }
 
@@ -279,6 +512,7 @@ async function startScan() {
 	border-radius: 12px;
 	background: var(--surface);
 	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+	margin-bottom: 8vh;
 }
 
 .form-card.scan-active {
@@ -325,15 +559,20 @@ input:focus {
 	box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
+input:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
 .barcode-row {
 	display: flex;
-	gap: 0.75rem;
 	align-items: center;
 }
 
 .scan-btn,
 .submit-btn {
 	height: 42px;
+	margin-top: 1rem;
 	padding: 0 1rem;
 	font-size: 0.95rem;
 	font-weight: 600;
@@ -357,6 +596,11 @@ button.error-btn {
 .submit-btn {
 	background: var(--brand);
 	color: var(--surface);
+}
+
+.submit-btn:disabled {
+	opacity: 0.7;
+	cursor: not-allowed;
 }
 
 .scan-btn:hover,
@@ -395,5 +639,157 @@ button.error-btn {
 
 input.input-error {
 	border-color: var(--error-strong);
+}
+
+.prefill-section {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+	padding: 1rem;
+	background: var(--surface-strong);
+	border: 1px solid var(--surface-border);
+	border-radius: 8px;
+}
+
+.prefill-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 1rem;
+}
+
+.prefill-header h3 {
+	margin: 0;
+	font-size: 1rem;
+	color: var(--text-primary);
+}
+
+.prefill-source {
+	display: inline-block;
+	padding: 0.25rem 0.75rem;
+	background: var(--brand-soft);
+	color: var(--brand-strong);
+	border-radius: 4px;
+	font-size: 0.8rem;
+	font-weight: 600;
+}
+
+.prefill-image-preview {
+	width: 100%;
+	height: 150px;
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--surface);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.prefill-image-preview img {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+}
+
+.camera-capture-area {
+	display: flex;
+	flex-direction: column;
+	gap: 0.75rem;
+}
+
+.image-preview {
+	position: relative;
+	width: 100%;
+	max-width: 280px;
+	height: 180px;
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--surface-strong);
+	border: 1px solid var(--surface-border);
+}
+
+.image-preview img {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.image-preview-actions {
+	display: flex;
+	gap: 0.5rem;
+	padding: 0.5rem;
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: linear-gradient(to top, rgba(2, 6, 23, 0.7), transparent);
+}
+
+.camera-controls {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.camera-controls .scan-btn {
+	width: 100%;
+}
+
+.hidden-capture-input {
+	display: none;
+}
+
+.image-placeholder {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	flex: 1;
+	padding: 1rem;
+	border: 2px dashed var(--surface-border);
+	border-radius: 8px;
+	background: var(--surface-strong);
+}
+
+.upload-btn {
+	height: 40px;
+	padding: 0 1rem;
+	background: var(--brand-soft);
+	color: var(--brand-strong);
+	border: none;
+	border-radius: 6px;
+	font-size: 0.9rem;
+	font-weight: 600;
+	cursor: pointer;
+	transition: filter 0.2s ease;
+}
+
+.upload-btn:hover {
+	filter: brightness(0.95);
+}
+
+.upload-hint {
+	margin: 0;
+	font-size: 0.8rem;
+	color: var(--text-secondary);
+}
+
+.field-error {
+	font-size: 0.8rem;
+	color: var(--error-strong);
+	margin-top: -0.25rem;
+}
+
+.loading-indicator {
+	padding: 1rem;
+	text-align: center;
+	color: var(--text-secondary);
+	font-size: 0.9rem;
+}
+
+.cancel-btn {
+	background: var(--error-soft);
+	color: var(--error-strong);
 }
 </style>

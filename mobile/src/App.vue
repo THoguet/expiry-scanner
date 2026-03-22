@@ -1,15 +1,20 @@
 <template>
 	<main class="container">
 		<RouterView />
-		<Footer />
+		<Footer @openClientIdModal="showClientIdModal = true" />
+		<ClientIdModal :isOpen="showClientIdModal" :currentClientId="CLIENT_ID" @close="showClientIdModal = false" />
 	</main>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { onMounted, ref } from "vue";
 import Footer from "./components/Footer.vue";
+import ClientIdModal from "./components/ClientIdModal.vue";
 import { updateNotifications } from "./services/notifications";
 import { useProducts } from "./services/products";
+import { CLIENT_ID } from "./main";
+
+const showClientIdModal = ref(false);
 
 onMounted(async () => {
 	await useProducts().loadProducts();

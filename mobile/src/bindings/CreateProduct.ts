@@ -2,6 +2,9 @@
 
 export type CreateProduct = {
   barcode: string;
+  name: string;
+  image: string | null;
+  image_base64: string | null;
   expiration_date: string;
   client_id: string;
 };

@@ -4,6 +4,8 @@ import {
 	deleteProduct,
 	editProduct,
 	getProductsWithBarcode,
+	getProductPrefill,
+	uploadProductImage,
 	ProductWithBarcode,
 } from "./backend";
 import { CLIENT_ID } from "../main";
@@ -11,6 +13,8 @@ import type { CreateProduct } from "../bindings/CreateProduct";
 import type { DeleteProduct } from "../bindings/DeleteProduct";
 import type { Product } from "../bindings/Product";
 import { EditProduct } from "../bindings/EditProduct";
+import type { ProductPrefill } from "../bindings/ProductPrefill";
+import type { UploadProductImageResponse } from "../bindings/UploadProductImageResponse";
 import { cancelNotificationsForProduct, updateNotifications } from "./notifications";
 
 const CACHE_TTL_MS = 60_000;
@@ -86,7 +90,7 @@ export async function addProduct(payload: CreateProduct): Promise<Product> {
 
 export async function removeProduct(payload: DeleteProduct): Promise<void> {
 	const productToRemove = useProducts().products.value.find(
-		([product]) => product.id === payload.id && product.client_id === payload.client_id,
+		([product]) => product.id === payload.id,
 	)?.[0];
 
 	if (productToRemove) {
@@ -130,11 +134,24 @@ export function useProducts(clientId: string = CLIENT_ID) {
 		await loadProducts(true);
 	}
 
+	async function getPrefill(barcode: string): Promise<ProductPrefill> {
+		return await getProductPrefill(barcode, clientId);
+	}
+
+	async function uploadImage(
+		barcode: string,
+		imageFile: File,
+	): Promise<UploadProductImageResponse> {
+		return await uploadProductImage(barcode, clientId, imageFile);
+	}
+
 	return {
 		products,
 		loading,
 		error,
 		loadProducts,
 		refreshProducts,
+		getPrefill,
+		uploadImage,
 	};
 }

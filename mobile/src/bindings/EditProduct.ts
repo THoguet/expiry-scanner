@@ -3,6 +3,8 @@
 export type EditProduct = {
   id: bigint;
   barcode: string;
+  name: string;
+  image: string | null;
   expiration_date: string;
   client_id: string;
 };

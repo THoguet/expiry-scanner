@@ -3,13 +3,16 @@ use std::error::Error;
 use csv::{ReaderBuilder, StringRecord};
 use sqlx::PgPool;
 use tokio::{fs::File, io::BufReader};
+use tracing::debug;
 
 use crate::{controller::barcode::Pagination, models::Barcode};
 
 pub async fn import_from_csv(file_path: &str, pool: &PgPool) -> Result<u64, Box<dyn Error>> {
+    debug!(file_path = %file_path, "import_from_csv started");
     let headers = load_tsv_headers(file_path)?;
     let total_columns = headers.len();
     if total_columns == 0 {
+        debug!("import_from_csv failed due to empty headers");
         return Err("The input file has no header columns".into());
     }
 
@@ -46,10 +49,15 @@ pub async fn import_from_csv(file_path: &str, pool: &PgPool) -> Result<u64, Box<
         .execute(&mut *conn)
         .await?;
 
+    debug!(
+        rows_affected = result.rows_affected(),
+        "import_from_csv completed"
+    );
     Ok(result.rows_affected())
 }
 
 fn load_tsv_headers(file_path: &str) -> Result<StringRecord, Box<dyn Error>> {
+    debug!(file_path = %file_path, "loading TSV headers");
     let file = std::fs::File::open(file_path)?;
     let mut reader = ReaderBuilder::new()
         .delimiter(b'\t')
@@ -60,6 +68,7 @@ fn load_tsv_headers(file_path: &str) -> Result<StringRecord, Box<dyn Error>> {
 }
 
 fn get_required_header_index(headers: &StringRecord, name: &str) -> Result<usize, Box<dyn Error>> {
+    debug!(required_header = %name, "resolving required header index");
     headers
         .iter()
         .position(|header| header == name)
@@ -73,6 +82,7 @@ fn get_required_header_index(headers: &StringRecord, name: &str) -> Result<usize
 }
 
 fn get_optional_header_index(headers: &StringRecord, name: &str) -> Option<usize> {
+    debug!(optional_header = %name, "resolving optional header index");
     headers.iter().position(|header| header == name)
 }
 
@@ -99,6 +109,7 @@ fn timestamptz_expr(header_idx: Option<usize>) -> String {
 }
 
 fn build_insert_from_staging_sql(headers: &StringRecord, code_index: usize) -> String {
+    debug!(code_index, "building insert SQL from staging");
     let code_col = format!("TRIM(split_part(line, E'\\t', {}))", code_index + 1);
 
     let url = text_expr(get_optional_header_index(headers, "url"));
@@ -208,6 +219,7 @@ fn build_insert_from_staging_sql(headers: &StringRecord, code_index: usize) -> S
 }
 
 pub async fn get_barcode(barcode: &str, pool: &PgPool) -> Result<Barcode, Box<dyn Error>> {
+    debug!(barcode = %barcode, "service get_barcode called");
     let query = "select id, code, url, creator, created_t, created_datetime, last_modified_t, last_modified_datetime, last_modified_by, last_updated_t, last_updated_datetime, product_name, abbreviated_product_name, generic_name, quantity, packaging, brands, categories, countries, countries_en, ingredients_text, nutriscore_score, nutriscore_grade, nova_group, image_url, image_small_url, last_image_t, last_image_datetime, main_category, main_category_en from barcode_database where code = $1 limit 1";
 
     let barcode = sqlx::query_as::<_, Barcode>(query)
@@ -215,6 +227,7 @@ pub async fn get_barcode(barcode: &str, pool: &PgPool) -> Result<Barcode, Box<dy
         .fetch_one(pool)
         .await?;
 
+    debug!("service get_barcode completed");
     Ok(barcode)
 }
 
@@ -222,6 +235,7 @@ pub async fn list_barcodes(
     pool: &PgPool,
     pagination: Pagination,
 ) -> Result<Vec<Barcode>, Box<dyn Error>> {
+    debug!(page = ?pagination.page, per_page = ?pagination.per_page, "service list_barcodes called");
     let limit_value = pagination.per_page.unwrap_or(50);
     let offset_value = pagination.page.unwrap_or(0) * limit_value;
     let query = "select id, code, url, creator, created_t, created_datetime, last_modified_t, last_modified_datetime, last_modified_by, last_updated_t, last_updated_datetime, product_name, abbreviated_product_name, generic_name, quantity, packaging, brands, categories, countries, countries_en, ingredients_text, nutriscore_score, nutriscore_grade, nova_group, image_url, image_small_url, last_image_t, last_image_datetime, main_category, main_category_en from barcode_database order by id asc limit $1 offset $2";
@@ -232,5 +246,6 @@ pub async fn list_barcodes(
         .fetch_all(pool)
         .await?;
 
+    debug!(count = barcodes.len(), "service list_barcodes completed");
     Ok(barcodes)
 }

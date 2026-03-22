@@ -2,6 +2,7 @@ use std::error::Error;
 
 use sqlx::types::Json;
 use sqlx::PgPool;
+use tracing::debug;
 
 use crate::models::{
     Barcode, BarcodePrefill, CreateProduct, CreateUserProductInfo, DeleteProduct, EditProduct,
@@ -25,6 +26,7 @@ pub async fn insert_product(
     new_product: &CreateProduct,
     pool: &PgPool,
 ) -> Result<Product, Box<dyn Error>> {
+    debug!(barcode = %new_product.barcode, client_id = %new_product.client_id, "query insert_product called");
     let query =
         "insert into products (barcode, name, image, expiration_date, client_id) values ($1, $2, $3, $4, $5) returning *";
 
@@ -44,6 +46,7 @@ pub async fn delete_product(
     delete_product: &DeleteProduct,
     pool: &PgPool,
 ) -> Result<(), Box<dyn Error>> {
+    debug!(product_id = delete_product.id, client_id = %delete_product.client_id, "query delete_product called");
     let query = "delete from products where id=$1 and client_id=$2";
 
     sqlx::query(query)
@@ -59,6 +62,7 @@ pub async fn list_products_with_client_id(
     pool: &PgPool,
     client_id: uuid::Uuid,
 ) -> Result<Vec<Product>, Box<dyn Error>> {
+    debug!(client_id = %client_id, "query list_products_with_client_id called");
     let query = "select * from products where client_id=$1 order by expiration_date asc";
 
     let products = sqlx::query_as::<_, Product>(query)
@@ -66,6 +70,10 @@ pub async fn list_products_with_client_id(
         .fetch_all(pool)
         .await?;
 
+    debug!(
+        count = products.len(),
+        "query list_products_with_client_id completed"
+    );
     Ok(products)
 }
 
@@ -73,6 +81,7 @@ pub async fn list_join_product_barcode_barcode_code(
     pool: &PgPool,
     client_id: uuid::Uuid,
 ) -> Result<Vec<(Product, Option<crate::models::Barcode>)>, Box<dyn Error>> {
+    debug!(client_id = %client_id, "query list_join_product_barcode_barcode_code called");
     let query = "select p.*, to_jsonb(b) as barcode_payload from products p left join barcode_database b on p.barcode = b.code where p.client_id=$1 order by p.expiration_date asc";
 
     let rows = sqlx::query_as::<_, ProductWithOptionalBarcodeRow>(query)
@@ -82,6 +91,7 @@ pub async fn list_join_product_barcode_barcode_code(
 
     let products_with_barcodes = rows.into_iter().map(|row| row.into_tuple()).collect();
 
+    debug!("query list_join_product_barcode_barcode_code completed");
     Ok(products_with_barcodes)
 }
 
@@ -90,6 +100,7 @@ pub async fn get_product_by_id_with_barcode(
     product_id: i64,
     client_id: uuid::Uuid,
 ) -> Result<(Product, Option<crate::models::Barcode>), Box<dyn Error>> {
+    debug!(product_id, client_id = %client_id, "query get_product_by_id_with_barcode called");
     let query = "select p.*, to_jsonb(b) as barcode_payload from products p left join barcode_database b on p.barcode = b.code where p.id=$1 and p.client_id=$2";
 
     let row = sqlx::query_as::<_, ProductWithOptionalBarcodeRow>(query)
@@ -105,6 +116,7 @@ pub async fn get_barcode_prefill(
     pool: &PgPool,
     barcode: &str,
 ) -> Result<Option<BarcodePrefill>, Box<dyn Error>> {
+    debug!(barcode = %barcode, "query get_barcode_prefill called");
     let query = "select code as barcode, product_name as name, coalesce(image_url, image_small_url) as image from barcode_database where code=$1 limit 1";
 
     let prefill = sqlx::query_as::<_, BarcodePrefill>(query)
@@ -115,11 +127,27 @@ pub async fn get_barcode_prefill(
     Ok(prefill)
 }
 
+pub async fn barcode_exists_in_database(
+    pool: &PgPool,
+    barcode: &str,
+) -> Result<bool, Box<dyn Error>> {
+    debug!(barcode = %barcode, "query barcode_exists_in_database called");
+    let query = "select exists(select 1 from barcode_database where code=$1)";
+
+    let exists = sqlx::query_scalar::<_, bool>(query)
+        .bind(barcode)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(exists)
+}
+
 pub async fn get_user_product_info_by_client(
     pool: &PgPool,
     barcode: &str,
     client_id: uuid::Uuid,
 ) -> Result<Option<UserProductInfo>, Box<dyn Error>> {
+    debug!(barcode = %barcode, client_id = %client_id, "query get_user_product_info_by_client called");
     let query = "select * from user_product_info where barcode=$1 and client_id=$2 order by updated_at desc limit 1";
 
     let info = sqlx::query_as::<_, UserProductInfo>(query)
@@ -135,6 +163,7 @@ pub async fn get_user_product_info_global(
     pool: &PgPool,
     barcode: &str,
 ) -> Result<Option<UserProductInfo>, Box<dyn Error>> {
+    debug!(barcode = %barcode, "query get_user_product_info_global called");
     let query = "select * from user_product_info where barcode=$1 order by updated_at desc limit 1";
 
     let info = sqlx::query_as::<_, UserProductInfo>(query)
@@ -149,6 +178,7 @@ pub async fn upsert_user_product_info(
     new_info: &CreateUserProductInfo,
     pool: &PgPool,
 ) -> Result<UserProductInfo, Box<dyn Error>> {
+    debug!(barcode = %new_info.barcode, client_id = %new_info.client_id, "query upsert_user_product_info called");
     let query = "insert into user_product_info (barcode, name, image, client_id) values ($1, $2, $3, $4) on conflict (barcode, client_id) do update set name=excluded.name, image=excluded.image, updated_at=now() returning *";
 
     let info = sqlx::query_as::<_, UserProductInfo>(query)
@@ -166,6 +196,7 @@ pub async fn edit_product(
     edit_product: &EditProduct,
     pool: &PgPool,
 ) -> Result<Product, Box<dyn Error>> {
+    debug!(product_id = edit_product.id, client_id = %edit_product.client_id, "query edit_product called");
     let query = "update products set expiration_date=$1, barcode=$2, name=$3, image=$4 where id=$5 and client_id=$6 returning *";
 
     let product = sqlx::query_as::<_, Product>(query)
@@ -175,6 +206,25 @@ pub async fn edit_product(
         .bind(&edit_product.image)
         .bind(&edit_product.id)
         .bind(&edit_product.client_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(product)
+}
+
+pub async fn set_product_image(
+    pool: &PgPool,
+    product_id: i64,
+    client_id: uuid::Uuid,
+    image: Option<String>,
+) -> Result<Product, Box<dyn Error>> {
+    debug!(product_id, client_id = %client_id, "query set_product_image called");
+    let query = "update products set image=$1 where id=$2 and client_id=$3 returning *";
+
+    let product = sqlx::query_as::<_, Product>(query)
+        .bind(image)
+        .bind(product_id)
+        .bind(client_id)
         .fetch_one(pool)
         .await?;
 

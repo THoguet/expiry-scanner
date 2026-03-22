@@ -1,5 +1,6 @@
 use axum::{extract::State, routing::get, Router};
 use sqlx::PgPool;
+use tracing::debug;
 
 use crate::service;
 
@@ -7,6 +8,7 @@ pub mod barcode;
 pub mod product;
 
 pub fn router(pool: PgPool) -> Router {
+    debug!("building root router");
     Router::new()
         .route("/health", get(health_check))
         .route("/db_check", get(db_check))
@@ -16,12 +18,20 @@ pub fn router(pool: PgPool) -> Router {
 }
 
 async fn health_check() -> &'static str {
+    debug!("health_check called");
     "OK"
 }
 
 async fn db_check(State(pool): State<PgPool>) -> &'static str {
+    debug!("db_check called");
     match service::db_check(&pool).await {
-        Ok(_) => "DB OK",
-        Err(_) => "DB FAIL",
+        Ok(_) => {
+            debug!("db_check successful");
+            "DB OK"
+        }
+        Err(err) => {
+            debug!(error = %err, "db_check failed");
+            "DB FAIL"
+        }
     }
 }

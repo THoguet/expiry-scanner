@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 #[derive(Serialize, FromRow, TS, Debug)]
 #[ts(export)]
+#[allow(dead_code)]
 pub struct Product {
     pub id: i64,
     pub barcode: String,
@@ -13,6 +14,9 @@ pub struct Product {
     pub image: Option<String>,
     pub expiration_date: chrono::NaiveDate,
     pub created_at: DateTime<Utc>,
+    #[allow(dead_code)]
+    #[serde(skip_serializing)]
+    #[ts(skip)]
     pub client_id: Uuid,
 }
 
@@ -22,6 +26,7 @@ pub struct CreateProduct {
     pub barcode: String,
     pub name: String,
     pub image: Option<String>,
+    pub image_base64: Option<String>,
     pub expiration_date: chrono::NaiveDate,
     pub client_id: Uuid,
 }
@@ -46,11 +51,15 @@ pub struct DeleteProduct {
 
 #[derive(Serialize, Deserialize, FromRow, TS, Debug)]
 #[ts(export)]
+#[allow(dead_code)]
 pub struct UserProductInfo {
     pub id: i64,
     pub barcode: String,
     pub name: Option<String>,
     pub image: Option<String>,
+    #[allow(dead_code)]
+    #[serde(skip_serializing)]
+    #[ts(skip)]
     pub client_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

@@ -55,11 +55,17 @@ const daysLeftError = ref(false);
 const TIME_TO_DELETE_MS = 2000;
 
 function getName(): string {
+	// Use product snapshot (stored at creation time)
+	if (pro.value.name) return pro.value.name;
+	// Fallback to barcode data if name is missing (backward compatibility)
 	if (barcode.value && barcode.value.product_name) return barcode.value.product_name;
 	return "Unknown product; ID: " + pro.value.barcode;
 }
 
 function getImageUrl(): string {
+	// Use product snapshot (stored at creation time)
+	if (pro.value.image) return pro.value.image;
+	// Fallback to barcode data if image is missing (backward compatibility)
 	if (barcode.value && barcode.value.image_url) return barcode.value.image_url;
 	return "/no_img.png";
 }

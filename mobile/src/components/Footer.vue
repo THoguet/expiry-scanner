@@ -8,15 +8,24 @@
 			:class="router.currentRoute.value.path === '/AddProduct' ? 'router-active' : ''">
 			<FontAwesomeIcon :icon="faCamera" />
 		</button>
+		<button type="button" @click="openClientIdModal" title="Settings">
+			<FontAwesomeIcon :icon="faCog" />
+		</button>
 	</div>
 </template>
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { faCamera, faList } from '@fortawesome/free-solid-svg-icons';
+import { faCamera, faList, faCog } from '@fortawesome/free-solid-svg-icons';
 
 const router = useRouter();
+
+const emit = defineEmits<{ openClientIdModal: [] }>();
+
+function openClientIdModal() {
+	emit('openClientIdModal');
+}
 
 </script>
 
@@ -38,7 +47,7 @@ const router = useRouter();
 .footer button {
 	color: var(--brand-strong);
 	height: 100%;
-	width: 50%;
+	width: 33.333%;
 	display: flex;
 	justify-content: center;
 	align-items: center;
