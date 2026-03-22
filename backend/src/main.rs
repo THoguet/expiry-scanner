@@ -10,6 +10,7 @@ use clap::Parser;
 use dotenvy::dotenv;
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 
 #[derive(Parser)]
 #[command(
@@ -91,7 +92,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
         return Ok(());
     }
 
-    let app = controller::router(pool).layer(cors);
+    let app = controller::router(pool)
+        .nest_service("/images", ServeDir::new("images"))
+        .layer(cors);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     println!("Listening on {}", addr);

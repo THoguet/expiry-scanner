@@ -11,6 +11,8 @@ Content-Type: application/json
 
 {
     "barcode": "5055950623132",
+    "name": "Prefilled product name",
+    "image": "https://example.com/image.jpg",
     "expiration_date": "2026-02-05",
     "client_id": "a3057b80-46d0-4013-9509-9eebd4a8ca2b"
 }
@@ -35,3 +37,26 @@ GET http://localhost:3000/barcodes HTTP/1.1
 ###
 
 GET http://localhost:3000/products/with-barcode?client_id=a3057b80-46d0-4013-9509-9eebd4a8ca2b HTTP/1.1
+
+###
+
+GET http://localhost:3000/products/prefill/5055950623132?client_id=a3057b80-46d0-4013-9509-9eebd4a8ca2b HTTP/1.1
+
+###
+
+POST http://localhost:3000/products/info HTTP/1.1
+Content-Type: application/json
+
+{
+    "barcode": "5055950623132",
+    "name": "Product entered by user",
+    "image": "https://example.com/image.jpg",
+    "client_id": "a3057b80-46d0-4013-9509-9eebd4a8ca2b"
+}
+
+###
+
+POST http://localhost:3000/products/image/5055950623132?client_id=a3057b80-46d0-4013-9509-9eebd4a8ca2b HTTP/1.1
+Content-Type: image/jpeg
+
+< ./test-assets/sample.jpg

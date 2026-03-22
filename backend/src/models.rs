@@ -9,6 +9,8 @@ use uuid::Uuid;
 pub struct Product {
     pub id: i64,
     pub barcode: String,
+    pub name: String,
+    pub image: Option<String>,
     pub expiration_date: chrono::NaiveDate,
     pub created_at: DateTime<Utc>,
     pub client_id: Uuid,
@@ -18,6 +20,8 @@ pub struct Product {
 #[ts(export)]
 pub struct CreateProduct {
     pub barcode: String,
+    pub name: String,
+    pub image: Option<String>,
     pub expiration_date: chrono::NaiveDate,
     pub client_id: Uuid,
 }
@@ -27,6 +31,8 @@ pub struct CreateProduct {
 pub struct EditProduct {
     pub id: i64,
     pub barcode: String,
+    pub name: String,
+    pub image: Option<String>,
     pub expiration_date: chrono::NaiveDate,
     pub client_id: Uuid,
 }
@@ -36,6 +42,49 @@ pub struct EditProduct {
 pub struct DeleteProduct {
     pub id: i64,
     pub client_id: Uuid,
+}
+
+#[derive(Serialize, Deserialize, FromRow, TS, Debug)]
+#[ts(export)]
+pub struct UserProductInfo {
+    pub id: i64,
+    pub barcode: String,
+    pub name: Option<String>,
+    pub image: Option<String>,
+    pub client_id: Uuid,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct CreateUserProductInfo {
+    pub barcode: String,
+    pub name: Option<String>,
+    pub image: Option<String>,
+    pub client_id: Uuid,
+}
+
+#[derive(Serialize, TS, Debug)]
+#[ts(export)]
+pub struct ProductPrefill {
+    pub barcode: String,
+    pub name: Option<String>,
+    pub image: Option<String>,
+    pub source: String,
+}
+
+#[derive(Serialize, TS, Debug)]
+#[ts(export)]
+pub struct UploadProductImageResponse {
+    pub image: String,
+}
+
+#[derive(FromRow, Debug)]
+pub struct BarcodePrefill {
+    pub barcode: String,
+    pub name: Option<String>,
+    pub image: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, FromRow, TS, Debug)]

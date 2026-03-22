@@ -1,0 +1,3 @@
+ALTER TABLE products
+ADD COLUMN name TEXT,
+ADD COLUMN image TEXT;

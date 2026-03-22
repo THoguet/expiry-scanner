@@ -3,7 +3,10 @@ use std::error::Error;
 use sqlx::types::Json;
 use sqlx::PgPool;
 
-use crate::models::{Barcode, CreateProduct, DeleteProduct, EditProduct, Product};
+use crate::models::{
+    Barcode, BarcodePrefill, CreateProduct, CreateUserProductInfo, DeleteProduct, EditProduct,
+    Product, UserProductInfo,
+};
 
 #[derive(sqlx::FromRow)]
 struct ProductWithOptionalBarcodeRow {
@@ -22,10 +25,13 @@ pub async fn insert_product(
     new_product: &CreateProduct,
     pool: &PgPool,
 ) -> Result<Product, Box<dyn Error>> {
-    let query = "insert into products (barcode, expiration_date, client_id) values ($1, $2, $3) returning *";
+    let query =
+        "insert into products (barcode, name, image, expiration_date, client_id) values ($1, $2, $3, $4, $5) returning *";
 
     let product = sqlx::query_as::<_, Product>(query)
         .bind(&new_product.barcode)
+        .bind(&new_product.name)
+        .bind(&new_product.image)
         .bind(&new_product.expiration_date)
         .bind(&new_product.client_id)
         .fetch_one(pool)
@@ -95,15 +101,78 @@ pub async fn get_product_by_id_with_barcode(
     Ok(row.into_tuple())
 }
 
+pub async fn get_barcode_prefill(
+    pool: &PgPool,
+    barcode: &str,
+) -> Result<Option<BarcodePrefill>, Box<dyn Error>> {
+    let query = "select code as barcode, product_name as name, coalesce(image_url, image_small_url) as image from barcode_database where code=$1 limit 1";
+
+    let prefill = sqlx::query_as::<_, BarcodePrefill>(query)
+        .bind(barcode)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(prefill)
+}
+
+pub async fn get_user_product_info_by_client(
+    pool: &PgPool,
+    barcode: &str,
+    client_id: uuid::Uuid,
+) -> Result<Option<UserProductInfo>, Box<dyn Error>> {
+    let query = "select * from user_product_info where barcode=$1 and client_id=$2 order by updated_at desc limit 1";
+
+    let info = sqlx::query_as::<_, UserProductInfo>(query)
+        .bind(barcode)
+        .bind(client_id)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(info)
+}
+
+pub async fn get_user_product_info_global(
+    pool: &PgPool,
+    barcode: &str,
+) -> Result<Option<UserProductInfo>, Box<dyn Error>> {
+    let query = "select * from user_product_info where barcode=$1 order by updated_at desc limit 1";
+
+    let info = sqlx::query_as::<_, UserProductInfo>(query)
+        .bind(barcode)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(info)
+}
+
+pub async fn upsert_user_product_info(
+    new_info: &CreateUserProductInfo,
+    pool: &PgPool,
+) -> Result<UserProductInfo, Box<dyn Error>> {
+    let query = "insert into user_product_info (barcode, name, image, client_id) values ($1, $2, $3, $4) on conflict (barcode, client_id) do update set name=excluded.name, image=excluded.image, updated_at=now() returning *";
+
+    let info = sqlx::query_as::<_, UserProductInfo>(query)
+        .bind(&new_info.barcode)
+        .bind(&new_info.name)
+        .bind(&new_info.image)
+        .bind(&new_info.client_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(info)
+}
+
 pub async fn edit_product(
     edit_product: &EditProduct,
     pool: &PgPool,
 ) -> Result<Product, Box<dyn Error>> {
-    let query = "update products set expiration_date=$1, barcode=$2 where id=$3 and client_id=$4 returning *";
+    let query = "update products set expiration_date=$1, barcode=$2, name=$3, image=$4 where id=$5 and client_id=$6 returning *";
 
     let product = sqlx::query_as::<_, Product>(query)
         .bind(&edit_product.expiration_date)
         .bind(&edit_product.barcode)
+        .bind(&edit_product.name)
+        .bind(&edit_product.image)
         .bind(&edit_product.id)
         .bind(&edit_product.client_id)
         .fetch_one(pool)
