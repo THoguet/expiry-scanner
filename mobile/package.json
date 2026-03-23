@@ -1,7 +1,7 @@
 {
 	"name": "expiry_scanner",
 	"private": true,
-	"version": "0.2",
+	"version": "0.2.1",
 	"type": "module",
 	"scripts": {
 		"dev": "vite",
@@ -22,13 +22,13 @@
 		"@tauri-apps/plugin-opener": "^2.5.3",
 		"@tauri-apps/plugin-store": "^2.4.2",
 		"vue": "^3.5.30",
-		"vue-router": "^5.0.3"
+		"vue-router": "^5.0.4"
 	},
 	"devDependencies": {
 		"@vitejs/plugin-vue": "^6.0.5",
-		"typescript": "~5.9.3",
-		"vite": "^8.0.0",
-		"vue-tsc": "^3.2.5",
+		"typescript": "~6.0.2",
+		"vite": "^8.0.2",
+		"vue-tsc": "^3.2.6",
 		"@tauri-apps/cli": "^2.10.1"
 	}
 }

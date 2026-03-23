@@ -16,6 +16,16 @@ const loading = ref(false);
 const error = ref<string | null>(null);
 
 export function useStocks(clientId: string = CLIENT_ID) {
+	function upsertLocalStock(updatedStock: Stock): void {
+		const index = stocks.value.findIndex((stock) => stock.id === updatedStock.id);
+		if (index === -1) {
+			stocks.value.push(updatedStock);
+			return;
+		}
+
+		stocks.value[index] = updatedStock;
+	}
+
 	async function loadStocks(): Promise<void> {
 		loading.value = true;
 		error.value = null;
@@ -46,13 +56,21 @@ export function useStocks(clientId: string = CLIENT_ID) {
 	async function updateStock(
 		stockId: Stock["id"],
 		payload: Omit<EditStock, "id" | "client_id">,
+		options: { refresh?: boolean } = {},
 	): Promise<Stock> {
+		const { refresh = true } = options;
 		const updatedStock = await editStock({
 			id: stockId,
 			...payload,
 			client_id: clientId,
 		});
-		await refreshStocks();
+
+		if (refresh) {
+			await refreshStocks();
+		} else {
+			upsertLocalStock(updatedStock);
+		}
+
 		return updatedStock;
 	}
 

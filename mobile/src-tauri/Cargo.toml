@@ -1,6 +1,6 @@
 [package]
 name = "expiry_scanner"
-version = "0.2.0"
+version = "0.2.1"
 description = "An application to scan product barcodes and track their expiry dates."
 authors = ["Theophyl"]
 edition = "2021"
