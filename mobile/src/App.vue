@@ -8,8 +8,8 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import Footer from "./components/Footer.vue";
-import ClientIdModal from "./components/ClientIdModal.vue";
+import Footer from "./components/shared/Footer.vue";
+import ClientIdModal from "./components/shared/ClientIdModal.vue";
 import { updateNotifications } from "./services/notifications";
 import { useProducts } from "./services/products";
 import { CLIENT_ID } from "./main";

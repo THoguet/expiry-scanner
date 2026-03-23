@@ -22,6 +22,19 @@ function getBaseUrl(): string {
 	return configuredUrl.replace(/\/$/, "");
 }
 
+function stringifyPayload(payload: unknown): string {
+	return JSON.stringify(payload, (_key, value) => {
+		if (typeof value !== "bigint") return value;
+
+		const asNumber = Number(value);
+		if (!Number.isSafeInteger(asNumber)) {
+			throw new Error("BigInt payload contains an unsafe integer value");
+		}
+
+		return asNumber;
+	});
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T | undefined> {
 	const response = await fetch(`${getBaseUrl()}${path}`, {
 		headers: {
@@ -53,7 +66,7 @@ export async function getProducts(clientId: string): Promise<Product[]> {
 export async function createProduct(payload: CreateProduct): Promise<Product> {
 	const created = await request<Product>("/products", {
 		method: "POST",
-		body: JSON.stringify(payload),
+		body: stringifyPayload(payload),
 	});
 
 	if (!created) {
@@ -66,14 +79,14 @@ export async function createProduct(payload: CreateProduct): Promise<Product> {
 export async function deleteProduct(payload: DeleteProduct): Promise<void> {
 	await request<void>("/products", {
 		method: "DELETE",
-		body: JSON.stringify(payload),
+		body: stringifyPayload(payload),
 	});
 }
 
 export async function editProduct(payload: EditProduct): Promise<Product> {
 	const updated = await request<Product>("/products", {
 		method: "PUT",
-		body: JSON.stringify(payload),
+		body: stringifyPayload(payload),
 	});
 
 	if (!updated) {
@@ -141,7 +154,7 @@ export async function getStocks(clientId: string): Promise<Stock[]> {
 export async function createStock(payload: CreateStock): Promise<Stock> {
 	const created = await request<Stock>("/stock", {
 		method: "POST",
-		body: JSON.stringify(payload),
+		body: stringifyPayload(payload),
 	});
 
 	if (!created) {
@@ -154,7 +167,7 @@ export async function createStock(payload: CreateStock): Promise<Stock> {
 export async function editStock(payload: EditStock): Promise<Stock> {
 	const updated = await request<Stock>("/stock", {
 		method: "PUT",
-		body: JSON.stringify(payload),
+		body: stringifyPayload(payload),
 	});
 
 	if (!updated) {
@@ -167,14 +180,14 @@ export async function editStock(payload: EditStock): Promise<Stock> {
 export async function deleteStock(payload: DeleteStock): Promise<void> {
 	await request<void>("/stock", {
 		method: "DELETE",
-		body: JSON.stringify(payload),
+		body: stringifyPayload(payload),
 	});
 }
 
 export async function adjustStockByDelta(stockId: Stock["id"], payload: AdjustStockDelta): Promise<Stock> {
 	const updated = await request<Stock>(`/stock/${encodeURIComponent(stockId.toString())}/delta`, {
 		method: "POST",
-		body: JSON.stringify(payload),
+		body: stringifyPayload(payload),
 	});
 
 	if (!updated) {

@@ -60,7 +60,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { setClientId, generateNewClientId, shareClientId } from '../services/ClientId';
+import { setClientId, generateNewClientId, shareClientId } from '../../services/ClientId';
 
 const emit = defineEmits<{ close: [] }>();
 

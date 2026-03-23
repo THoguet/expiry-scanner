@@ -94,7 +94,12 @@ export async function removeProduct(payload: DeleteProduct): Promise<void> {
 	)?.[0];
 
 	if (productToRemove) {
-		await cancelNotificationsForProduct(productToRemove);
+		try {
+			await cancelNotificationsForProduct(productToRemove);
+		} catch (notificationError) {
+			// Deletion should proceed even if notification cancellation fails.
+			console.warn("Failed to cancel notifications for product", notificationError);
+		}
 	}
 
 	await deleteProduct(payload);

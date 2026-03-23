@@ -54,7 +54,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
-import type { Stock } from "../bindings/Stock";
+import type { Stock } from "../../bindings/Stock";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 

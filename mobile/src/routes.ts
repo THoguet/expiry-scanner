@@ -1,8 +1,8 @@
 import { createMemoryHistory, createRouter } from 'vue-router'
 
-import ProductList from './components/ProductList.vue'
-import AddProduct from './components/AddProduct.vue'
-import StockManager from './components/StockManager.vue'
+import ProductList from './components/product/ProductList.vue'
+import AddProduct from './components/product/AddProduct.vue'
+import StockManager from './components/stock/StockManager.vue'
 
 const routes = [
 	{ path: '/', component: ProductList },

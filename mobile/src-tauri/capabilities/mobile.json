@@ -9,10 +9,12 @@
 	],
 	"permissions": [
 		"barcode-scanner:default",
+		"fs:default",
 		"haptics:allow-impact-feedback",
 		"haptics:allow-notification-feedback",
 		"haptics:allow-selection-feedback",
 		"haptics:allow-vibrate",
-		"notification:default"
+		"notification:default",
+		"share:default"
 	]
 }

@@ -15,9 +15,9 @@
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue';
-import { ProductWithBarcode } from '../services/backend';
-import { removeProduct, useProducts } from '../services/products';
-import { CLIENT_ID } from '../main';
+import { ProductWithBarcode } from '../../services/backend';
+import { removeProduct, useProducts } from '../../services/products';
+import { CLIENT_ID } from '../../main';
 import ProductBox from './ProductBox.vue';
 import EditProduct from './EditProduct.vue';
 
@@ -31,6 +31,10 @@ function openEditPanel(product: ProductWithBarcode) {
 
 
 async function onDeleteProductRequested(product: ProductWithBarcode[0]) {
+	if (productToEdit.value && productToEdit.value[0].id === product.id) {
+		productToEdit.value = null;
+	}
+
 	await removeProduct({ id: product.id, client_id: CLIENT_ID });
 }
 
