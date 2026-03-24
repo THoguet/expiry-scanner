@@ -9,7 +9,7 @@ import { useStocks } from "../services/stocks";
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 export function useStockManager() {
-	const { stocks, loading, error, loadStocks, addStock, updateStock, removeStockById } = useStocks();
+	const { stocks, loading, error, loadStocks, addStock, updateStock, removeStockById, adjustStockQuantity } = useStocks();
 
 	const creatingStock = ref(false);
 	const shareLoading = ref(false);
@@ -20,7 +20,6 @@ export function useStockManager() {
 	const detailedLineView = ref<Record<string, boolean>>({});
 	const lineSaveStates = ref<Record<string, SaveState>>({});
 
-	const saveDebounceMs = 650;
 	const pendingSaves = new Map<string, number>();
 	const clearSaveFeedbackTimers = new Map<string, number>();
 
@@ -138,41 +137,6 @@ export function useStockManager() {
 				return left.name.localeCompare(right.name);
 			})
 			.map((stock) => stock.id);
-	}
-
-	function queueDebouncedSave(stock: Stock): void {
-		const key = stock.id.toString();
-		const previousTimeout = pendingSaves.get(key);
-		if (previousTimeout !== undefined) {
-			window.clearTimeout(previousTimeout);
-		}
-		setLineSaveState(stock.id, "saving");
-
-		const timeoutId = window.setTimeout(async () => {
-			pendingSaves.delete(key);
-			try {
-				await updateStock(
-					stock.id,
-					{
-						name: normalizeRequiredText(stock.name),
-						desired_quantity: normalizeQuantity(stock.desired_quantity),
-						current_quantity: normalizeQuantity(stock.current_quantity),
-						unit: normalizeOptionalText(stock.unit),
-						location: normalizeOptionalText(stock.location),
-					},
-					{ refresh: false },
-				);
-				setLineSaveState(stock.id, "saved");
-				clearSaveFeedbackLater(stock.id);
-			} catch (saveError) {
-				console.error(saveError);
-				setLineSaveState(stock.id, "error");
-				clearSaveFeedbackLater(stock.id, 2200);
-				setTimedMessage("Oops, failed to save stock changes", true);
-			}
-		}, saveDebounceMs);
-
-		pendingSaves.set(key, timeoutId);
 	}
 
 	function getMissingQuantity(stock: Stock): number {
@@ -305,22 +269,30 @@ export function useStockManager() {
 
 	async function increment(stock: Stock): Promise<void> {
 		clearMessages();
+		setLineSaveState(stock.id, "saving");
 		try {
-			stock.current_quantity = normalizeQuantity(stock.current_quantity + 1);
-			queueDebouncedSave(stock);
+			await adjustStockQuantity(stock.id, 1);
+			setLineSaveState(stock.id, "saved");
+			clearSaveFeedbackLater(stock.id);
 		} catch (adjustError) {
 			console.error(adjustError);
+			setLineSaveState(stock.id, "error");
+			clearSaveFeedbackLater(stock.id, 2200);
 			setTimedMessage("Oops, failed to increase stock", true);
 		}
 	}
 
 	async function decrement(stock: Stock): Promise<void> {
 		clearMessages();
+		setLineSaveState(stock.id, "saving");
 		try {
-			stock.current_quantity = normalizeQuantity(stock.current_quantity - 1);
-			queueDebouncedSave(stock);
+			await adjustStockQuantity(stock.id, -1);
+			setLineSaveState(stock.id, "saved");
+			clearSaveFeedbackLater(stock.id);
 		} catch (adjustError) {
 			console.error(adjustError);
+			setLineSaveState(stock.id, "error");
+			clearSaveFeedbackLater(stock.id, 2200);
 			setTimedMessage("Oops, failed to decrease stock", true);
 		}
 	}
