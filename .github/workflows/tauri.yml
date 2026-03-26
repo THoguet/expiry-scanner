@@ -45,6 +45,21 @@ jobs:
         working-directory: ./mobile
         run: bun install
 
+      - name: Run tests
+        working-directory: ./mobile
+        run: bun run test
+
+      - name: Generate coverage report
+        working-directory: ./mobile
+        run: bun run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./mobile/coverage/coverage-final.json
+          flags: mobile
+          fail_ci_if_error: false
+
       - name: Build frontend
         working-directory: ./mobile
         run: bun run build

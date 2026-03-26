@@ -6,6 +6,9 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "vue-tsc --noEmit && vite build",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"test:watch": "vitest",
 		"preview": "vite preview",
 		"tauri": "tauri"
 	},
@@ -28,6 +31,8 @@
 	},
 	"devDependencies": {
 		"@vitejs/plugin-vue": "^6.0.5",
+		"@vitest/coverage-istanbul": "^3.2.4",
+		"vitest": "^3.2.4",
 		"typescript": "~6.0.2",
 		"vite": "^8.0.2",
 		"vue-tsc": "^3.2.6",
