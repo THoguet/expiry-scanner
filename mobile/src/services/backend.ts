@@ -164,15 +164,11 @@ export async function createStock(payload: CreateStock): Promise<Stock> {
 	return created;
 }
 
-export async function editStock(payload: EditStock): Promise<Stock> {
+export async function editStock(payload: EditStock): Promise<Stock | undefined> {
 	const updated = await request<Stock>("/stock", {
 		method: "PUT",
 		body: stringifyPayload(payload),
 	});
-
-	if (!updated) {
-		throw new Error("Failed to edit stock");
-	}
 
 	return updated;
 }

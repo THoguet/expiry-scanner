@@ -67,11 +67,32 @@ export function useStocks(clientId: string = CLIENT_ID) {
 
 		if (refresh) {
 			await refreshStocks();
-		} else {
-			upsertLocalStock(updatedStock);
-		}
+			const refreshedStock = stocks.value.find((stock) => stock.id === stockId);
+			if (refreshedStock) {
+				return refreshedStock;
+			}
 
-		return updatedStock;
+			if (updatedStock) {
+				return updatedStock;
+			}
+
+			throw new Error("Failed to update stock");
+		} else {
+			if (updatedStock) {
+				upsertLocalStock(updatedStock);
+			}
+
+			const currentStock = stocks.value.find((stock) => stock.id === stockId);
+			if (currentStock) {
+				return currentStock;
+			}
+
+			if (updatedStock) {
+				return updatedStock;
+			}
+
+			throw new Error("Failed to update stock");
+		}
 	}
 
 	async function removeStockById(stockId: Stock["id"]): Promise<void> {
