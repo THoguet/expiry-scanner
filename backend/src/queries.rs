@@ -312,3 +312,41 @@ pub async fn adjust_stock_delta(
 
     Ok(stock)
 }
+
+pub async fn refresh_user_product_info_last_linked_at(
+    pool: &PgPool,
+) -> Result<u64, Box<dyn Error>> {
+    debug!("query refresh_user_product_info_last_linked_at called");
+    let query = "update user_product_info upi set last_linked_at=now() where exists (select 1 from products p where p.barcode=upi.barcode)";
+
+    let result = sqlx::query(query).execute(pool).await?;
+
+    Ok(result.rows_affected())
+}
+
+pub async fn delete_stale_stock(pool: &PgPool) -> Result<u64, Box<dyn Error>> {
+    debug!("query delete_stale_stock called");
+    let query = "delete from stock where updated_at < now() - interval '6 months'";
+
+    let result = sqlx::query(query).execute(pool).await?;
+
+    Ok(result.rows_affected())
+}
+
+pub async fn delete_outlier_products(pool: &PgPool) -> Result<u64, Box<dyn Error>> {
+    debug!("query delete_outlier_products called");
+    let query = "delete from products where expiration_date < (current_date - interval '90 days')::date or expiration_date > (current_date + interval '10 years')::date";
+
+    let result = sqlx::query(query).execute(pool).await?;
+
+    Ok(result.rows_affected())
+}
+
+pub async fn delete_orphan_user_product_info(pool: &PgPool) -> Result<u64, Box<dyn Error>> {
+    debug!("query delete_orphan_user_product_info called");
+    let query = "delete from user_product_info upi where not exists (select 1 from products p where p.barcode=upi.barcode) and upi.last_linked_at < now() - interval '1 year'";
+
+    let result = sqlx::query(query).execute(pool).await?;
+
+    Ok(result.rows_affected())
+}

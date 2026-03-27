@@ -14,9 +14,8 @@
 					<label>Your Client ID</label>
 					<div class="client-id-display">
 						<input type="text" :value="localClientId" readonly class="client-id-input" />
-						<button type="button" class="copy-btn" @click="copyToClipboard"
-							:title="copyFeedback || 'Copy to clipboard'">
-							{{ copyFeedback || 'Copy' }}
+						<button type="button" class="copy-btn" @click="copyToClipboard" title="Copy to clipboard">
+							Copy
 						</button>
 					</div>
 					<p class="info-text">This ID links all your devices together</p>
@@ -26,8 +25,7 @@
 				<div class="custom-id-section">
 					<label for="customInput">Set Custom ID (optional)</label>
 					<input id="customInput" type="text" v-model="customInput"
-						placeholder="Enter a custom ID or leave blank" class="custom-input" @input="clearError" />
-					<span v-if="inputError" class="field-error">{{ inputError }}</span>
+						placeholder="Enter a custom ID or leave blank" class="custom-input" />
 
 					<div class="button-group">
 						<button type="button" class="btn-apply" @click="applyCustomId" :disabled="!customInput.trim()">
@@ -49,10 +47,6 @@
 					</button>
 				</div>
 
-				<!-- Feedback Messages -->
-				<div v-if="successMessage" class="success-message">
-					{{ successMessage }}
-				</div>
 			</div>
 		</div>
 	</div>
@@ -61,6 +55,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { setClientId, generateNewClientId, shareClientId } from '../../services/ClientId';
+import { useToast } from '../../services/toast';
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -71,10 +66,8 @@ const props = defineProps<{
 
 const localClientId = ref(props.currentClientId);
 const customInput = ref('');
-const inputError = ref<string | null>(null);
-const successMessage = ref<string | null>(null);
 const shareLoading = ref(false);
-const copyFeedback = ref<string | null>(null);
+const toast = useToast();
 
 watch(() => props.currentClientId, (newId) => {
 	localClientId.value = newId;
@@ -92,31 +85,20 @@ function closeModal() {
 
 function resetForm() {
 	customInput.value = '';
-	inputError.value = null;
-	successMessage.value = null;
 	shareLoading.value = false;
-	copyFeedback.value = null;
-}
-
-function clearError() {
-	inputError.value = null;
 }
 
 function clearCustomInput() {
 	customInput.value = '';
-	inputError.value = null;
 }
 
 function copyToClipboard() {
 	navigator.clipboard.writeText(localClientId.value)
 		.then(() => {
-			copyFeedback.value = 'Copied!';
-			setTimeout(() => {
-				copyFeedback.value = null;
-			}, 2000);
+			toast.success('Copied!');
 		})
 		.catch(() => {
-			inputError.value = 'Failed to copy';
+			toast.error('Failed to copy');
 		});
 }
 
@@ -124,35 +106,30 @@ function applyCustomId() {
 	const trimmedInput = customInput.value.trim();
 
 	if (!trimmedInput) {
-		inputError.value = 'ID cannot be empty';
+		toast.error('ID cannot be empty');
 		return;
 	}
 
 	if (trimmedInput.length < 5) {
-		inputError.value = 'ID must be at least 5 characters';
+		toast.error('ID must be at least 5 characters');
 		return;
 	}
 
 	if (trimmedInput.length > 100) {
-		inputError.value = 'ID must be less than 100 characters';
+		toast.error('ID must be less than 100 characters');
 		return;
 	}
 
 	// Check for valid characters
 	if (!trimmedInput.match(/^[a-zA-Z0-9\-_]+$/)) {
-		inputError.value = 'ID can only contain letters, numbers, hyphens, and underscores';
+		toast.error('ID can only contain letters, numbers, hyphens, and underscores');
 		return;
 	}
 
 	setClientId(trimmedInput);
 	localClientId.value = trimmedInput;
-	successMessage.value = 'Client ID updated successfully';
+	toast.success('Client ID updated successfully');
 	customInput.value = '';
-	inputError.value = null;
-
-	setTimeout(() => {
-		successMessage.value = null;
-	}, 3000);
 
 	// Emit event to trigger page reload or state update
 	window.location.reload();
@@ -162,13 +139,10 @@ async function shareCurrentId() {
 	shareLoading.value = true;
 	try {
 		await shareClientId(localClientId.value);
-		successMessage.value = 'ID shared successfully';
-		setTimeout(() => {
-			successMessage.value = null;
-		}, 3000);
+		toast.success('ID shared successfully');
 	} catch (error) {
 		console.error('Share failed:', error);
-		inputError.value = 'Failed to share ID';
+		toast.error('Failed to share ID');
 	} finally {
 		shareLoading.value = false;
 	}
@@ -178,7 +152,7 @@ function resetToNewId() {
 	if (confirm('Generate a new Client ID? Your current ID will be replaced.')) {
 		const newId = generateNewClientId();
 		localClientId.value = newId;
-		successMessage.value = 'New Client ID generated';
+		toast.success('New Client ID generated');
 
 		setTimeout(() => {
 			window.location.reload();
@@ -343,11 +317,6 @@ function resetToNewId() {
 	box-shadow: 0 0 0 3px var(--focus-ring);
 }
 
-.field-error {
-	font-size: 0.8rem;
-	color: var(--error-strong);
-}
-
 .button-group {
 	display: flex;
 	gap: 0.5rem;
@@ -421,15 +390,5 @@ function resetToNewId() {
 
 .btn-reset:hover {
 	filter: brightness(0.9);
-}
-
-.success-message {
-	padding: 0.75rem;
-	background: var(--brand-soft);
-	color: var(--brand-strong);
-	border-radius: 6px;
-	text-align: center;
-	font-weight: 600;
-	font-size: 0.9rem;
 }
 </style>

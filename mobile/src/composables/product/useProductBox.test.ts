@@ -151,6 +151,36 @@ describe("useProductBox", () => {
 		expect(onDelete.mock.calls.length).toBeGreaterThanOrEqual(0);
 	});
 
+	it("clears active vibration when opening edit panel", async () => {
+		mockInvoke.mockResolvedValue(4);
+		const onDelete = vi.fn();
+		const onEdit = vi.fn();
+		const { useProductBox } = await import("./useProductBox");
+		const box = useProductBox({ product: makeProduct() }, onDelete, onEdit);
+
+		box.startTimerToDelete();
+		vi.advanceTimersByTime(350);
+		box.openEditPanel();
+		vi.runAllTimers();
+
+		expect(onEdit).toHaveBeenCalledWith(1n);
+		expect(onDelete).not.toHaveBeenCalled();
+	});
+
+	it("clears active vibration with clearTimerToDelete", async () => {
+		mockInvoke.mockResolvedValue(4);
+		const onDelete = vi.fn();
+		const { useProductBox } = await import("./useProductBox");
+		const box = useProductBox({ product: makeProduct() }, onDelete, vi.fn());
+
+		box.startTimerToDelete();
+		vi.advanceTimersByTime(350);
+		box.clearTimerToDelete();
+		vi.runAllTimers();
+
+		expect(onDelete).not.toHaveBeenCalled();
+	});
+
 	it("opens edit panel and clears timers", async () => {
 		mockInvoke.mockRejectedValueOnce(new Error("calc fail"));
 		const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);

@@ -29,10 +29,6 @@
 
 		<StockSearchToolbar v-model="searchQuery" :visible="filteredStocks.length" :total="stocks.length" />
 
-		<p v-if="statusMessage" class="status success">{{ statusMessage }}</p>
-		<p v-if="errorMessage" class="status error">{{ errorMessage }}</p>
-		<p v-if="error" class="status error">{{ error }}</p>
-
 		<div v-if="loading" class="status">Loading stocks...</div>
 		<div v-else-if="stocks.length === 0" class="status">No stock yet. Add your first stock line above.</div>
 		<div v-else-if="filteredStocks.length === 0" class="status">No stock matches your search.</div>
@@ -56,11 +52,8 @@ import StockSearchToolbar from "./StockSearchToolbar.vue";
 const {
 	stocks,
 	loading,
-	error,
 	creatingStock,
 	shareLoading,
-	errorMessage,
-	statusMessage,
 	searchQuery,
 	filteredStocks,
 	newStock,
@@ -133,15 +126,6 @@ input {
 	border-radius: 0.65rem;
 	background: var(--surface-strong);
 	border: 1px solid var(--surface-border);
-}
-
-.status.success {
-	background: var(--brand-soft);
-}
-
-.status.error {
-	background: var(--error-soft);
-	color: var(--error-strong);
 }
 
 .stock-grid {

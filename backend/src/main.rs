@@ -9,6 +9,7 @@ use axum::http::Method;
 use clap::Parser;
 use dotenvy::dotenv;
 use sqlx::{migrate::Migrator, postgres::PgPoolOptions};
+use tokio_cron_scheduler::{Job, JobScheduler};
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
@@ -97,6 +98,30 @@ async fn main() -> Result<(), Box<dyn Error>> {
         tracing::info!("CSV import completed. Exiting without starting API server.");
         return Ok(());
     }
+
+    let cleanup_pool = pool.clone();
+    let scheduler = JobScheduler::new().await?;
+    scheduler
+        .add(Job::new_async("0 0 0 * * *", move |_uuid, _lock| {
+            let cleanup_pool = cleanup_pool.clone();
+            Box::pin(async move {
+                match service::maintenance::run_nightly_cleanup(&cleanup_pool).await {
+                    Ok(report) => tracing::info!(
+                        refreshed_user_links = report.refreshed_user_links,
+                        deleted_stale_stock = report.deleted_stale_stock,
+                        deleted_outlier_products = report.deleted_outlier_products,
+                        deleted_orphan_user_product_info = report.deleted_orphan_user_product_info,
+                        "nightly cleanup batch finished"
+                    ),
+                    Err(error) => {
+                        tracing::error!(error = %error, "nightly cleanup batch failed")
+                    }
+                }
+            })
+        })?)
+        .await?;
+    scheduler.start().await?;
+    tracing::info!("nightly cleanup scheduler initialized");
 
     let app = controller::router(pool)
         .nest_service("/product_image", ServeDir::new("product_image"))

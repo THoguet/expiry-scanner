@@ -1,20 +1,20 @@
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { isTauri } from "@tauri-apps/api/core";
 import { join, tempDir } from "@tauri-apps/api/path";
 import { BaseDirectory, writeTextFile } from "@tauri-apps/plugin-fs";
 import { shareFile } from "tauri-plugin-share";
 import type { Stock } from "../bindings/Stock";
 import { useStocks } from "../services/stocks";
+import { useToast } from "../services/toast";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
 export function useStockManager() {
 	const { stocks, loading, error, loadStocks, addStock, updateStock, removeStockById } = useStocks();
+	const toast = useToast();
 
 	const creatingStock = ref(false);
 	const shareLoading = ref(false);
-	const errorMessage = ref<string | null>(null);
-	const statusMessage = ref<string | null>(null);
 	const searchQuery = ref("");
 	const displayOrder = ref<Stock["id"][]>([]);
 	const detailedLineView = ref<Record<string, boolean>>({});
@@ -35,6 +35,12 @@ export function useStockManager() {
 	onMounted(async () => {
 		await loadStocks();
 		resetDisplayOrder();
+	});
+
+	watch(error, (nextError, prevError) => {
+		if (nextError && nextError !== prevError) {
+			toast.error(nextError);
+		}
 	});
 
 	onBeforeUnmount(() => {
@@ -150,6 +156,7 @@ export function useStockManager() {
 
 		const timeoutId = window.setTimeout(async () => {
 			pendingSaves.delete(key);
+			const savingToastId = toast.show("Saving stock changes...", "success");
 			try {
 				await updateStock(
 					stock.id,
@@ -164,11 +171,14 @@ export function useStockManager() {
 				);
 				setLineSaveState(stock.id, "saved");
 				clearSaveFeedbackLater(stock.id);
+				toast.success("Stock line saved");
 			} catch (saveError) {
 				console.error(saveError);
 				setLineSaveState(stock.id, "error");
 				clearSaveFeedbackLater(stock.id, 2200);
-				setTimedMessage("Oops, failed to save stock changes", true);
+				toast.error("Oops, failed to save stock changes");
+			} finally {
+				toast.dismiss(savingToastId);
 			}
 		}, saveDebounceMs);
 
@@ -207,34 +217,13 @@ export function useStockManager() {
 		return `Missing ${amount}`;
 	}
 
-	function clearMessages(): void {
-		errorMessage.value = null;
-		statusMessage.value = null;
-	}
-
-	function setTimedMessage(message: string, isError: boolean = false): void {
-		if (isError) {
-			errorMessage.value = message;
-			statusMessage.value = null;
-		} else {
-			statusMessage.value = message;
-			errorMessage.value = null;
-		}
-
-		setTimeout(() => {
-			errorMessage.value = null;
-			statusMessage.value = null;
-		}, 2500);
-	}
-
 	async function createNewStock(): Promise<void> {
-		clearMessages();
 		creatingStock.value = true;
 
 		try {
 			const name = normalizeRequiredText(newStock.value.name);
 			if (!name) {
-				setTimedMessage("Name is required", true);
+				toast.error("Name is required");
 				return;
 			}
 
@@ -254,17 +243,16 @@ export function useStockManager() {
 				location: "",
 			};
 			resetDisplayOrder();
-			setTimedMessage("Nice! Stock line added");
+			toast.success("Nice! Stock line added");
 		} catch (saveError) {
 			console.error(saveError);
-			setTimedMessage("Oops, failed to add stock line", true);
+			toast.error("Oops, failed to add stock line");
 		} finally {
 			creatingStock.value = false;
 		}
 	}
 
 	async function save(stock: Stock): Promise<void> {
-		clearMessages();
 		const key = getStockKey(stock.id);
 		const pendingSave = pendingSaves.get(key);
 		if (pendingSave !== undefined) {
@@ -275,7 +263,7 @@ export function useStockManager() {
 		try {
 			const name = normalizeRequiredText(stock.name);
 			if (!name) {
-				setTimedMessage("Name is required", true);
+				toast.error("Name is required");
 				setLineSaveState(stock.id, "error");
 				clearSaveFeedbackLater(stock.id, 2200);
 				return;
@@ -294,39 +282,36 @@ export function useStockManager() {
 			);
 			setLineSaveState(stock.id, "saved");
 			clearSaveFeedbackLater(stock.id);
-			setTimedMessage("Sweet! Stock line saved");
+			toast.success("Sweet! Stock line saved");
 		} catch (saveError) {
 			console.error(saveError);
 			setLineSaveState(stock.id, "error");
 			clearSaveFeedbackLater(stock.id, 2200);
-			setTimedMessage("Oops, failed to save stock line", true);
+			toast.error("Oops, failed to save stock line");
 		}
 	}
 
 	async function increment(stock: Stock): Promise<void> {
-		clearMessages();
 		try {
 			stock.current_quantity = normalizeQuantity(stock.current_quantity + 1);
 			queueDebouncedSave(stock);
 		} catch (adjustError) {
 			console.error(adjustError);
-			setTimedMessage("Oops, failed to increase stock", true);
+			toast.error("Oops, failed to increase stock");
 		}
 	}
 
 	async function decrement(stock: Stock): Promise<void> {
-		clearMessages();
 		try {
 			stock.current_quantity = normalizeQuantity(stock.current_quantity - 1);
 			queueDebouncedSave(stock);
 		} catch (adjustError) {
 			console.error(adjustError);
-			setTimedMessage("Oops, failed to decrease stock", true);
+			toast.error("Oops, failed to decrease stock");
 		}
 	}
 
 	async function remove(stockId: Stock["id"]): Promise<void> {
-		clearMessages();
 		try {
 			await removeStockById(stockId);
 			const key = getStockKey(stockId);
@@ -339,10 +324,10 @@ export function useStockManager() {
 			lineSaveStates.value = nextSaveStates;
 
 			resetDisplayOrder();
-			setTimedMessage("Done! Stock line deleted");
+			toast.success("Done! Stock line deleted");
 		} catch (deleteError) {
 			console.error(deleteError);
-			setTimedMessage("Oops, failed to delete stock line", true);
+			toast.error("Oops, failed to delete stock line");
 		}
 	}
 
@@ -424,13 +409,12 @@ export function useStockManager() {
 	}
 
 	async function shareGroceryList(): Promise<void> {
-		clearMessages();
 		shareLoading.value = true;
 
 		const text = buildGroceryText();
 		try {
 			if (await shareWithNativeMobileSheet(text)) {
-				setTimedMessage("Nice! Grocery list shared");
+				toast.success("Nice! Grocery list shared");
 				return;
 			}
 
@@ -439,15 +423,15 @@ export function useStockManager() {
 					title: "Grocery list",
 					text,
 				});
-				setTimedMessage("Nice! Grocery list shared");
+				toast.success("Nice! Grocery list shared");
 				return;
 			}
 
 			await navigator.clipboard.writeText(text);
-			setTimedMessage("Nice! Grocery list copied to clipboard");
+			toast.success("Nice! Grocery list copied to clipboard");
 		} catch (shareError) {
 			console.error(shareError);
-			setTimedMessage("Oops, failed to share grocery list", true);
+			toast.error("Oops, failed to share grocery list");
 		} finally {
 			shareLoading.value = false;
 		}
@@ -459,8 +443,6 @@ export function useStockManager() {
 		error,
 		creatingStock,
 		shareLoading,
-		errorMessage,
-		statusMessage,
 		searchQuery,
 		filteredStocks,
 		newStock,

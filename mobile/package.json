@@ -7,7 +7,9 @@
 		"dev": "vite",
 		"build": "vue-tsc --noEmit && vite build",
 		"test": "vitest run",
+		"test:typecheck": "vue-tsc --noEmit",
 		"test:coverage": "vitest run --coverage",
+		"test:validate": "bun run test:typecheck && bun run test:coverage",
 		"test:watch": "vitest",
 		"preview": "vite preview",
 		"tauri": "tauri"
@@ -26,15 +28,15 @@
 		"@tauri-apps/plugin-opener": "^2.5.3",
 		"@tauri-apps/plugin-store": "^2.4.2",
 		"tauri-plugin-share": "^2.0.4",
-		"vue": "^3.5.30",
+		"vue": "^3.5.31",
 		"vue-router": "^5.0.4"
 	},
 	"devDependencies": {
 		"@vitejs/plugin-vue": "^6.0.5",
-		"@vitest/coverage-istanbul": "^3.2.4",
-		"vitest": "^3.2.4",
+		"@vitest/coverage-istanbul": "^4.1.2",
+		"vitest": "^4.1.2",
 		"typescript": "~6.0.2",
-		"vite": "^8.0.2",
+		"vite": "^8.0.3",
 		"vue-tsc": "^3.2.6",
 		"@tauri-apps/cli": "^2.10.1"
 	}

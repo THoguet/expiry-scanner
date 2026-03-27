@@ -1,6 +1,7 @@
 <template>
 	<main class="container">
 		<RouterView />
+		<ToastHost />
 		<Footer @openClientIdModal="showClientIdModal = true" />
 		<ClientIdModal :isOpen="showClientIdModal" :currentClientId="CLIENT_ID" @close="showClientIdModal = false" />
 	</main>
@@ -10,6 +11,7 @@
 import { onMounted, ref } from "vue";
 import Footer from "./components/shared/Footer.vue";
 import ClientIdModal from "./components/shared/ClientIdModal.vue";
+import ToastHost from "./components/shared/ToastHost.vue";
 import { updateNotifications } from "./services/notifications";
 import { useProducts } from "./services/products";
 import { CLIENT_ID } from "./main";

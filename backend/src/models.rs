@@ -118,6 +118,7 @@ pub struct UserProductInfo {
     pub client_id: Uuid,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub last_linked_at: DateTime<Utc>,
 }
 
 #[derive(Deserialize, TS)]

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
+import { nextTick } from "vue";
 import type { Stock } from "../bindings/Stock";
 
 vi.mock("vue", async () => {
@@ -21,6 +22,10 @@ const mockWriteTextFile = vi.fn();
 const mockTempDir = vi.fn().mockResolvedValue("/tmp");
 const mockJoin = vi.fn().mockResolvedValue("/tmp/list.txt");
 const mockShareFile = vi.fn();
+const mockToastSuccess = vi.fn();
+const mockToastError = vi.fn();
+const mockToastShow = vi.fn().mockReturnValue(1);
+const mockToastDismiss = vi.fn();
 
 const stocksRef = ref<Stock[]>([]);
 const loadingRef = ref(false);
@@ -41,6 +46,15 @@ vi.mock("@tauri-apps/api/core", () => ({ isTauri: mockIsTauri }));
 vi.mock("@tauri-apps/plugin-fs", () => ({ BaseDirectory: { Temp: "Temp" }, writeTextFile: mockWriteTextFile }));
 vi.mock("@tauri-apps/api/path", () => ({ tempDir: mockTempDir, join: mockJoin }));
 vi.mock("tauri-plugin-share", () => ({ shareFile: mockShareFile }));
+vi.mock("/src/services/toast.ts", () => ({
+	useToast: () => ({
+		success: mockToastSuccess,
+		error: mockToastError,
+		show: mockToastShow,
+		dismiss: mockToastDismiss,
+		toasts: ref([]),
+	}),
+}));
 
 function makeStock(id: bigint, name: string, desired: number, current: number): Stock {
 	return {
@@ -81,18 +95,18 @@ describe("useStockManager", () => {
 
 		mgr.newStock.value.name = "";
 		await mgr.createNewStock();
-		expect(mgr.errorMessage.value).toBe("Name is required");
+		expect(mockToastError).toHaveBeenCalledWith("Name is required");
 
 		mgr.newStock.value = { name: "Beans", desired_quantity: 4, current_quantity: 1, unit: "can", location: "shelf" };
 		await mgr.createNewStock();
 		expect(mockAddStock).toHaveBeenCalled();
-		expect(mgr.statusMessage.value).toContain("added");
+		expect(mockToastSuccess).toHaveBeenCalledWith("Nice! Stock line added");
 		expect(mgr.newStock.value.name).toBe("");
 
 		mockAddStock.mockRejectedValueOnce(new Error("create fail"));
 		mgr.newStock.value = { name: "Fail", desired_quantity: 1, current_quantity: 0, unit: "", location: "" };
 		await mgr.createNewStock();
-		expect(mgr.errorMessage.value).toContain("failed to add");
+		expect(mockToastError).toHaveBeenCalledWith("Oops, failed to add stock line");
 	});
 
 	it("saves, increments and decrements stock", async () => {
@@ -103,12 +117,12 @@ describe("useStockManager", () => {
 
 		stock.name = "";
 		await mgr.save(stock);
-		expect(mgr.errorMessage.value).toBe("Name is required");
+		expect(mockToastError).toHaveBeenCalledWith("Name is required");
 
 		stock.name = "Rice";
 		await mgr.save(stock);
 		expect(mockUpdateStock).toHaveBeenCalled();
-		expect(mgr.statusMessage.value).toContain("saved");
+		expect(mockToastSuccess).toHaveBeenCalledWith("Sweet! Stock line saved");
 
 		await mgr.increment(stock);
 		await mgr.decrement(stock);
@@ -122,7 +136,7 @@ describe("useStockManager", () => {
 
 		mockUpdateStock.mockRejectedValueOnce(new Error("save fail"));
 		await mgr.save(stock);
-		expect(mgr.errorMessage.value).toContain("failed to save stock line");
+		expect(mockToastError).toHaveBeenCalledWith("Oops, failed to save stock line");
 	});
 
 	it("removes stock and handles delete errors", async () => {
@@ -131,11 +145,19 @@ describe("useStockManager", () => {
 		const mgr = useStockManager();
 		await mgr.remove(1n);
 		expect(mockRemoveStockById).toHaveBeenCalledWith(1n);
-		expect(mgr.statusMessage.value).toContain("deleted");
+		expect(mockToastSuccess).toHaveBeenCalledWith("Done! Stock line deleted");
 
 		mockRemoveStockById.mockRejectedValueOnce(new Error("delete fail"));
 		await mgr.remove(2n);
-		expect(mgr.errorMessage.value).toContain("failed to delete");
+		expect(mockToastError).toHaveBeenCalledWith("Oops, failed to delete stock line");
+	});
+
+	it("shows toast when stocks load error changes", async () => {
+		const { useStockManager } = await import("./useStockManager");
+		useStockManager();
+		errorRef.value = "Failed to load stocks";
+		await nextTick();
+		expect(mockToastError).toHaveBeenCalledWith("Failed to load stocks");
 	});
 
 	it("filters and labels stock states", async () => {
@@ -225,5 +247,86 @@ describe("useStockManager", () => {
 		await mgr.shareGroceryList();
 		expect(errSpy).toHaveBeenCalled();
 		errSpy.mockRestore();
+	});
+
+	it("handles increment and decrement runtime errors", async () => {
+		const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+		const { useStockManager } = await import("./useStockManager");
+		const mgr = useStockManager();
+
+		const badStock = { ...stocksRef.value[0] } as Stock;
+		Object.defineProperty(badStock, "current_quantity", {
+			get() {
+				throw new Error("bad quantity getter");
+			},
+			set() {
+				// no-op
+			},
+			configurable: true,
+		});
+
+		await mgr.increment(badStock);
+		expect(mockToastError).toHaveBeenCalledWith("Oops, failed to increase stock");
+
+		await mgr.decrement(badStock);
+		expect(mockToastError).toHaveBeenCalledWith("Oops, failed to decrease stock");
+		errSpy.mockRestore();
+	});
+
+	it("clears pending debounced save when manual save is triggered", async () => {
+		mockUpdateStock.mockResolvedValue(makeStock(1n, "Rice", 5, 2));
+		const { useStockManager } = await import("./useStockManager");
+		const mgr = useStockManager();
+		const stock = stocksRef.value[0];
+
+		await mgr.increment(stock);
+		expect(mockToastShow).not.toHaveBeenCalled();
+
+		await mgr.save(stock);
+		expect(mockUpdateStock).toHaveBeenCalled();
+		expect(mockToastShow).not.toHaveBeenCalled();
+		const successCountBeforeDebouncedSave = mockToastSuccess.mock.calls.length;
+
+		await mgr.increment(stock);
+		vi.runAllTimers();
+		await Promise.resolve();
+		expect(mockToastShow).toHaveBeenCalledWith("Saving stock changes...", "success");
+		expect(mockToastDismiss).toHaveBeenCalledWith(1);
+		expect(mockToastSuccess.mock.calls.length).toBe(successCountBeforeDebouncedSave + 1);
+	});
+
+	it("builds grocery list fallback sections and unnamed/no-unit lines", async () => {
+		const { useStockManager } = await import("./useStockManager");
+		const mgr = useStockManager();
+
+		const clipboardWrite = vi.fn().mockResolvedValue(undefined);
+		Object.defineProperty(globalThis, "navigator", {
+			value: { userAgent: "Mozilla", clipboard: { writeText: clipboardWrite } },
+			configurable: true,
+		});
+		Object.defineProperty(window, "navigator", {
+			value: navigator,
+			configurable: true,
+		});
+
+		stocksRef.value = [{
+			...makeStock(20n, "   ", 1, 2),
+			unit: null,
+			location: null,
+		}] as Stock[];
+		await mgr.shareGroceryList();
+		const stockedOnlyText = clipboardWrite.mock.calls[clipboardWrite.mock.calls.length - 1]?.[0] as string;
+		expect(stockedOnlyText).toContain("- Nothing needed right now.");
+		expect(stockedOnlyText).toContain("- Unnamed: 2/1");
+
+		stocksRef.value = [{
+			...makeStock(21n, "Milk", 4, 1),
+			unit: null,
+			location: null,
+		}] as Stock[];
+		await mgr.shareGroceryList();
+		const missingOnlyText = clipboardWrite.mock.calls[clipboardWrite.mock.calls.length - 1]?.[0] as string;
+		expect(missingOnlyText).toContain("- No fully stocked items yet.");
+		expect(missingOnlyText).toContain("- Milk: 1/4 (need 3)");
 	});
 });

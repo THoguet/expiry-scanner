@@ -1,14 +1,15 @@
 <template>
 	<article class="stock-card" :class="stateClass" @click="onCardClick">
 		<div v-if="!isDetailed" class="compact-controls">
-			<p class="stock-name">{{ stock.name }}</p>
-			<p class="stock-missing" :class="stateClass">{{ stateLabel }}</p>
-			<div class="quick-quantity">
-				<button type="button" @click="emit('decrement')">-1</button>
-				<span>{{ normalizeQuantity(stock.current_quantity) }}</span>
-				<button type="button" @click="emit('increment')">+1</button>
+			<div class="compact-main">
+				<p class="stock-name">{{ stock.name }}</p>
+				<p class="stock-missing" :class="stateClass">{{ stateLabel }}</p>
+				<div class="quick-quantity">
+					<button type="button" @click="emit('decrement')">-1</button>
+					<span>{{ normalizeQuantity(stock.current_quantity) }}</span>
+					<button type="button" @click="emit('increment')">+1</button>
+				</div>
 			</div>
-			<p v-if="saveState !== 'idle'" class="save-feedback" :class="saveState">{{ saveStateLabel }}</p>
 		</div>
 
 		<template v-else>
@@ -47,13 +48,11 @@
 				<button type="button" class="save-btn" @click="emit('save')">Save</button>
 				<button type="button" class="danger" @click="emit('remove')">Delete</button>
 			</div>
-			<p v-if="saveState !== 'idle'" class="save-feedback" :class="saveState">{{ saveStateLabel }}</p>
 		</template>
 	</article>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
 import type { Stock } from "../../bindings/Stock";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -66,7 +65,7 @@ const emit = defineEmits<{
 	toggleView: [];
 }>();
 
-const props = defineProps<{
+defineProps<{
 	stock: Stock;
 	isDetailed: boolean;
 	stateClass: "critical" | "warning" | "ok";
@@ -74,13 +73,6 @@ const props = defineProps<{
 	quantitySummary: string;
 	saveState: SaveState;
 }>();
-
-const saveStateLabel = computed(() => {
-	if (props.saveState === "saving") return "Saving...";
-	if (props.saveState === "saved") return "Saved";
-	if (props.saveState === "error") return "Save failed";
-	return "";
-});
 
 function normalizeQuantity(value: number): number {
 	if (!Number.isFinite(value)) return 0;
@@ -170,8 +162,14 @@ function onCardClick(event: MouseEvent): void {
 }
 
 .compact-controls {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.compact-main {
 	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto auto auto;
+	grid-template-columns: minmax(0, 1fr) auto auto;
 	align-items: center;
 	gap: 0.45rem;
 }
@@ -261,25 +259,6 @@ function onCardClick(event: MouseEvent): void {
 
 .actions-row .danger {
 	background: var(--error-soft);
-	color: var(--error-strong);
-}
-
-.save-feedback {
-	margin: 0;
-	font-size: 0.78rem;
-	font-weight: 600;
-	text-align: right;
-}
-
-.save-feedback.saving {
-	color: #0f766e;
-}
-
-.save-feedback.saved {
-	color: #166534;
-}
-
-.save-feedback.error {
 	color: var(--error-strong);
 }
 

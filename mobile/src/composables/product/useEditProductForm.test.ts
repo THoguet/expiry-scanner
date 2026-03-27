@@ -54,6 +54,9 @@ describe("useEditProductForm", () => {
 		form.onNameInput();
 		expect(form.showNameError.value).toBe(false);
 		expect(form.saveError.value).toBeNull();
+
+		form.onNameInput();
+		expect(form.saveError.value).toBeNull();
 	});
 
 	it("handles image selection limits and preview", async () => {
@@ -95,6 +98,18 @@ describe("useEditProductForm", () => {
 		warnSpy.mockRestore();
 	});
 
+	it("saves product without selected image upload", async () => {
+		const onClose = vi.fn();
+		mockSaveEditedProduct.mockResolvedValue({});
+		const { useEditProductForm } = await import("./useEditProductForm");
+		const form = useEditProductForm(makeProduct(), onClose);
+
+		await form.saveEdit();
+		expect(mockSaveEditedProduct).toHaveBeenCalled();
+		expect(mockUploadImage).not.toHaveBeenCalled();
+		expect(onClose).toHaveBeenCalled();
+	});
+
 	it("handles save failure", async () => {
 		const onClose = vi.fn();
 		const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -120,5 +135,26 @@ describe("useEditProductForm", () => {
 		await form.deleteProductById();
 		expect(onClose).toHaveBeenCalled();
 		expect(mockRemoveProduct).toHaveBeenCalled();
+	});
+
+	it("handles delete failure after confirmation", async () => {
+		const onClose = vi.fn();
+		const errSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+		Object.defineProperty(globalThis, "confirm", { value: vi.fn(() => true), configurable: true });
+		mockRemoveProduct.mockRejectedValueOnce(new Error("delete fail"));
+		const { useEditProductForm } = await import("./useEditProductForm");
+		const form = useEditProductForm(makeProduct(), onClose);
+
+		await form.deleteProductById();
+		expect(onClose).toHaveBeenCalled();
+		expect(errSpy).toHaveBeenCalled();
+		errSpy.mockRestore();
+	});
+
+	it("clears image even without file input ref", async () => {
+		const { useEditProductForm } = await import("./useEditProductForm");
+		const form = useEditProductForm(makeProduct(), vi.fn());
+		form.clearImage();
+		expect(form.imagePreview.value).toBeNull();
 	});
 });
