@@ -81,7 +81,8 @@ const {
 
 <style scoped>
 .stock-page {
-	padding: 1rem;
+	padding-right: 1rem;
+	padding-left: 1rem;
 	padding-bottom: 9rem;
 	overflow: auto;
 	display: flex;

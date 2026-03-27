@@ -65,11 +65,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let cors = if app_env == "development" {
         println!("🔓 CORS: Permissive (Dev Mode)");
-        CorsLayer::permissive()
+        CorsLayer::very_permissive()
     } else {
         println!("🔒 CORS: Strict (Prod Mode)");
         CorsLayer::new()
-            .allow_methods([Method::GET, Method::POST, Method::DELETE])
+            .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::PUT])
             .allow_origin([
                 // "https://my-production-app.com".parse().unwrap(), // if web
                 "tauri://localhost".parse().unwrap(), // iOS/macOS
