@@ -16,7 +16,7 @@ use tower_http::services::ServeDir;
 #[derive(Parser)]
 #[command(
     name = "Expiry Scanner CLI",
-    version = "0.2.0",
+    version = env!("BACKEND_APP_VERSION"),
     about = "A CLI for managing the Expiry Scanner backend"
 )]
 pub struct Args {

@@ -15,6 +15,11 @@ fn calculate_days_left(expiry_date: String, format: String) -> Result<i64, Strin
     Ok((parsed_date - now_date).num_days())
 }
 
+#[tauri::command]
+fn app_version() -> String {
+    env!("MOBILE_APP_VERSION").to_string()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let builder = tauri::Builder::default()
@@ -22,7 +27,11 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_share::init())
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet, calculate_days_left]);
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            calculate_days_left,
+            app_version
+        ]);
 
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let builder = builder

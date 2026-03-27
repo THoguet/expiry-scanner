@@ -47,6 +47,11 @@
 					</button>
 				</div>
 
+				<div class="app-version-section">
+					<label>App Version</label>
+					<p class="version-value">{{ appVersion }}</p>
+				</div>
+
 			</div>
 		</div>
 	</div>
@@ -55,6 +60,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { setClientId, generateNewClientId, shareClientId } from '../../services/ClientId';
+import { getAppVersion } from '../../services/appVersion';
 import { useToast } from '../../services/toast';
 
 const emit = defineEmits<{ close: [] }>();
@@ -67,16 +73,20 @@ const props = defineProps<{
 const localClientId = ref(props.currentClientId);
 const customInput = ref('');
 const shareLoading = ref(false);
+const appVersion = ref('0.0.0-dev');
 const toast = useToast();
 
 watch(() => props.currentClientId, (newId) => {
 	localClientId.value = newId;
 });
 
-watch(() => props.isOpen, (isOpen) => {
-	if (!isOpen) {
-		resetForm();
+watch(() => props.isOpen, async (isOpen) => {
+	if (isOpen) {
+		appVersion.value = await getAppVersion();
+		return;
 	}
+
+	resetForm();
 });
 
 function closeModal() {
@@ -361,6 +371,27 @@ function resetToNewId() {
 	display: flex;
 	gap: 0.75rem;
 	flex-direction: column;
+}
+
+.app-version-section {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding-top: 0.5rem;
+	border-top: 1px solid var(--surface-border);
+}
+
+.app-version-section label {
+	font-size: 0.95rem;
+	font-weight: 600;
+	color: var(--text-secondary);
+}
+
+.version-value {
+	margin: 0;
+	font-family: 'Courier New', monospace;
+	font-size: 0.9rem;
+	color: var(--text-primary);
 }
 
 .btn-share,

@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -89,6 +91,8 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # -- 1. Setup Environment --
       - name: Setup Node
@@ -141,6 +145,83 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > $RUNNER_TEMP/keystore.jks
           echo "storeFile=$RUNNER_TEMP/keystore.jks" >> keystore.properties
 
+      - name: Resolve mobile build version
+        id: version
+        if: matrix.mobile == 'android'
+        run: |
+          TAG="$(git tag --points-at HEAD | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$' | head -n 1 || true)"
+
+          if [ -n "$TAG" ]; then
+            VERSION="${TAG#v}"
+            OFFICIAL="true"
+            RELEASE_TAG="$TAG"
+          else
+            VERSION="0.0.0-dev"
+            OFFICIAL="false"
+            RELEASE_TAG=""
+          fi
+
+          CORE_VERSION="$(echo "$VERSION" | sed -E 's/^([0-9]+\.[0-9]+\.[0-9]+).*/\1/')"
+          MAJOR="$(echo "$CORE_VERSION" | cut -d'.' -f1)"
+          MINOR="$(echo "$CORE_VERSION" | cut -d'.' -f2)"
+          PATCH="$(echo "$CORE_VERSION" | cut -d'.' -f3)"
+
+          if [ "$OFFICIAL" = "true" ]; then
+            VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + PATCH))
+          else
+            VERSION_CODE=1
+          fi
+
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "ANDROID_VERSION_CODE=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "RELEASE_TAG=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          echo "OFFICIAL=$OFFICIAL" >> "$GITHUB_OUTPUT"
+
+      - name: Sync mobile version files
+        if: matrix.mobile == 'android'
+        env:
+          APP_VERSION: ${{ steps.version.outputs.VERSION }}
+          ANDROID_VERSION_CODE: ${{ steps.version.outputs.ANDROID_VERSION_CODE }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+
+          const appVersion = process.env.APP_VERSION;
+          const androidVersionCode = process.env.ANDROID_VERSION_CODE;
+
+          const pkgPath = 'mobile/package.json';
+          const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+          pkg.version = appVersion;
+          fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, '\t') + '\n');
+
+          const cargoPath = 'mobile/src-tauri/Cargo.toml';
+          let cargo = fs.readFileSync(cargoPath, 'utf8');
+          cargo = cargo.replace(/^(version\s*=\s*")[^"]+("\s*)$/m, `$1${appVersion}$2`);
+          fs.writeFileSync(cargoPath, cargo);
+
+          const tauriConfPath = 'mobile/src-tauri/tauri.conf.json';
+          const tauri = JSON.parse(fs.readFileSync(tauriConfPath, 'utf8'));
+          tauri.version = appVersion;
+          fs.writeFileSync(tauriConfPath, JSON.stringify(tauri, null, '\t') + '\n');
+
+          const tauriPropsPath = 'mobile/src-tauri/gen/android/app/tauri.properties';
+          let props = fs.readFileSync(tauriPropsPath, 'utf8');
+
+          if (/(^|\n)tauri\.android\.versionName=/.test(props)) {
+            props = props.replace(/(^|\n)tauri\.android\.versionName=.*/, `$1tauri.android.versionName=${appVersion}`);
+          } else {
+            props += `\ntauri.android.versionName=${appVersion}`;
+          }
+
+          if (/(^|\n)tauri\.android\.versionCode=/.test(props)) {
+            props = props.replace(/(^|\n)tauri\.android\.versionCode=.*/, `$1tauri.android.versionCode=${androidVersionCode}`);
+          } else {
+            props += `\ntauri.android.versionCode=${androidVersionCode}`;
+          }
+
+          fs.writeFileSync(tauriPropsPath, props.endsWith('\n') ? props : `${props}\n`);
+          NODE
+
       # -- 2. Build the App Manually --
       - name: Build mobile app
         working-directory: ./mobile
@@ -156,17 +237,11 @@ jobs:
           retention-days: 7
 
       # -- 4. Create Release (Runs ONLY on main branch for Android) --
-      - name: Extract App Version
-        if: github.ref == 'refs/heads/main' && matrix.mobile == 'android'
-        id: version
-        working-directory: ./mobile/src-tauri
-        run: echo "VERSION=$(node -p "require('./tauri.conf.json').version")" >> "$GITHUB_OUTPUT"
-
       - name: Create GitHub Release
-        if: github.ref == 'refs/heads/main' && matrix.mobile == 'android'
+        if: github.ref == 'refs/heads/main' && matrix.mobile == 'android' && steps.version.outputs.OFFICIAL == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: mobile-v${{ steps.version.outputs.VERSION }}
+          tag_name: ${{ steps.version.outputs.RELEASE_TAG }}
           name: Mobile v${{ steps.version.outputs.VERSION }}
           body: |
             ## What's new
