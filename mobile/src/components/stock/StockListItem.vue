@@ -6,7 +6,7 @@
 				<p class="stock-missing" :class="stateClass">{{ stateLabel }}</p>
 				<div class="quick-quantity">
 					<button type="button" @click="emit('decrement')">-1</button>
-					<span>{{ normalizeQuantity(stock.current_quantity) }}</span>
+					<span>{{ normalizeQuantity(stock.current_quantity) }}{{ stock.unit ? ` ${stock.unit}` : '' }}</span>
 					<button type="button" @click="emit('increment')">+1</button>
 				</div>
 			</div>
@@ -34,7 +34,7 @@
 				</label>
 				<label>
 					Unit
-					<input v-model="stock.unit" type="text" maxlength="20" placeholder="pcs, kg..." />
+					<input v-model="stock.unit" type="text" maxlength="4" placeholder="pcs, kg..." />
 				</label>
 				<label>
 					Location

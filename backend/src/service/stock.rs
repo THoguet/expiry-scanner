@@ -30,6 +30,19 @@ pub async fn create_stock(
         return Err((StatusCode::BAD_REQUEST, "Invalid stock name".to_string()));
     }
 
+    if let Some(unit) = &new_stock.unit {
+        if unit.len() > 4 {
+            debug!(
+                unit_length = unit.len(),
+                "service create_stock rejected due to invalid unit length"
+            );
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Unit must be 4 characters or less".to_string(),
+            ));
+        }
+    }
+
     if new_stock.desired_quantity < 0 || new_stock.current_quantity < 0 {
         debug!(
             desired_quantity = new_stock.desired_quantity,
@@ -57,6 +70,19 @@ pub async fn edit_stock(
     if edit_stock.name.trim().is_empty() {
         debug!("service edit_stock rejected due to empty stock name");
         return Err((StatusCode::BAD_REQUEST, "Invalid stock name".to_string()));
+    }
+
+    if let Some(unit) = &edit_stock.unit {
+        if unit.len() > 4 {
+            debug!(
+                unit_length = unit.len(),
+                "service edit_stock rejected due to invalid unit length"
+            );
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "Unit must be 4 characters or less".to_string(),
+            ));
+        }
     }
 
     if edit_stock.desired_quantity < 0 || edit_stock.current_quantity < 0 {

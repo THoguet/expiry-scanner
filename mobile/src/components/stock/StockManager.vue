@@ -17,7 +17,7 @@
 			</label>
 			<label>
 				Unit
-				<input v-model="newStock.unit" type="text" maxlength="20" placeholder="pcs, kg..." />
+				<input v-model="newStock.unit" type="text" maxlength="4" placeholder="pcs, kg..." />
 			</label>
 			<label>
 				Location
