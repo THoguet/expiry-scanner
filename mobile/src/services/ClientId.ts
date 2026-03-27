@@ -1,7 +1,5 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { join, tempDir } from "@tauri-apps/api/path";
-import { BaseDirectory, writeTextFile } from "@tauri-apps/plugin-fs";
-import { shareFile } from "tauri-plugin-share";
+import { shareText } from "@buildyourwebapp/tauri-plugin-sharesheet";
 import { logger } from "./logger";
 
 export function getClientId(): string {
@@ -35,20 +33,70 @@ function shouldAttemptNativeSharePlugin(): boolean {
 	return looksMobileUserAgent || !hasWebShare;
 }
 
-async function shareClientIdWithPlugin(clientId: string): Promise<void> {
-	const text = `My Expiry Scanner Client ID: ${clientId}`;
-	const fileName = `client-id-${Date.now()}.txt`;
+async function shareClientIdWithNativePlugin(clientId: string): Promise<boolean> {
+	if (!shouldAttemptNativeSharePlugin()) {
+		return false;
+	}
 
-	await writeTextFile(fileName, text, {
-		baseDir: BaseDirectory.Temp,
-	});
+	try {
+		logger.debug("Sharing client ID through native sharesheet plugin", { clientId });
+		await shareText(`My Expiry Scanner Client ID: ${clientId}`);
+		return true;
+	} catch (pluginShareError) {
+		logger.warn("Native sharesheet plugin failed for client ID", {
+			clientId,
+			error: pluginShareError,
+		});
+		return false;
+	}
+}
 
-	const tempPath = await join(await tempDir(), fileName);
-	await shareFile(tempPath, "text/plain");
+async function copyClientIdToClipboard(clientId: string): Promise<boolean> {
+	if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+		try {
+			await navigator.clipboard.writeText(clientId);
+			return true;
+		} catch (clipboardError) {
+			logger.warn("Clipboard API write failed for client ID, trying legacy copy", {
+				clientId,
+				error: clipboardError,
+			});
+		}
+	}
+
+	if (typeof document === "undefined") {
+		return false;
+	}
+
+	const textArea = document.createElement("textarea");
+	textArea.value = clientId;
+	textArea.setAttribute("readonly", "");
+	textArea.style.position = "fixed";
+	textArea.style.opacity = "0";
+	textArea.style.pointerEvents = "none";
+	document.body.appendChild(textArea);
+	textArea.focus();
+	textArea.select();
+
+	try {
+		return document.execCommand("copy");
+	} catch (legacyCopyError) {
+		logger.warn("Legacy copy command failed for client ID", {
+			clientId,
+			error: legacyCopyError,
+		});
+		return false;
+	} finally {
+		document.body.removeChild(textArea);
+	}
 }
 
 export async function shareClientId(clientId: string): Promise<void> {
-	if (navigator.share) {
+	if (await shareClientIdWithNativePlugin(clientId)) {
+		return;
+	}
+
+	if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
 		try {
 			logger.debug("Sharing client ID through Web Share API", { clientId });
 			await navigator.share({
@@ -64,19 +112,10 @@ export async function shareClientId(clientId: string): Promise<void> {
 		}
 	}
 
-	if (shouldAttemptNativeSharePlugin()) {
-		try {
-			logger.debug("Sharing client ID through native share plugin", { clientId });
-			await shareClientIdWithPlugin(clientId);
-			return;
-		} catch (pluginShareError) {
-			logger.warn("Native share plugin failed for client ID, falling back to clipboard", {
-				clientId,
-				error: pluginShareError,
-			});
-		}
+	if (await copyClientIdToClipboard(clientId)) {
+		logger.info("Client ID copied to clipboard", { clientId });
+		return;
 	}
 
-	await navigator.clipboard.writeText(clientId);
-	logger.info("Client ID copied to clipboard", { clientId });
+	throw new Error("Unable to share or copy client ID on this device");
 }

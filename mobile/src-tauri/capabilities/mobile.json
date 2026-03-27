@@ -1,21 +1,24 @@
 {
-  "identifier": "mobile-capability",
-  "platforms": [
-    "android",
-    "iOS"
-  ],
-  "windows": [
-    "main"
-  ],
-  "permissions": [
-    "barcode-scanner:default",
-    "fs:default",
-    "haptics:allow-impact-feedback",
-    "haptics:allow-notification-feedback",
-    "haptics:allow-selection-feedback",
-    "haptics:allow-vibrate",
-    "notification:default",
-    "share:default",
-    "log:default"
-  ]
+	"identifier": "mobile-capability",
+	"platforms": [
+		"android",
+		"iOS"
+	],
+	"windows": [
+		"main"
+	],
+	"permissions": [
+		"barcode-scanner:default",
+		"fs:default",
+		"fs:allow-write-text-file",
+		"fs:allow-temp-write",
+		"fs:allow-temp-write-recursive",
+		"haptics:allow-impact-feedback",
+		"haptics:allow-notification-feedback",
+		"haptics:allow-selection-feedback",
+		"haptics:allow-vibrate",
+		"notification:default",
+		"sharesheet:allow-share-text",
+		"log:default"
+	]
 }

@@ -2,34 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
 	mockIsTauri,
-	mockJoin,
-	mockTempDir,
-	mockWriteTextFile,
-	mockShareFile,
+	mockShareText,
 } = vi.hoisted(() => ({
 	mockIsTauri: vi.fn(() => false),
-	mockJoin: vi.fn(async () => "/tmp/client-id.txt"),
-	mockTempDir: vi.fn(async () => "/tmp"),
-	mockWriteTextFile: vi.fn(async () => undefined),
-	mockShareFile: vi.fn(async () => undefined),
+	mockShareText: vi.fn(async () => undefined),
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
 	isTauri: mockIsTauri,
 }));
 
-vi.mock("@tauri-apps/api/path", () => ({
-	join: mockJoin,
-	tempDir: mockTempDir,
-}));
-
-vi.mock("@tauri-apps/plugin-fs", () => ({
-	BaseDirectory: { Temp: "Temp" },
-	writeTextFile: mockWriteTextFile,
-}));
-
-vi.mock("tauri-plugin-share", () => ({
-	shareFile: mockShareFile,
+vi.mock("@buildyourwebapp/tauri-plugin-sharesheet", () => ({
+	shareText: mockShareText,
 }));
 
 describe("ClientId service", () => {
@@ -37,10 +21,7 @@ describe("ClientId service", () => {
 		vi.resetModules();
 		vi.clearAllMocks();
 		mockIsTauri.mockReturnValue(false);
-		mockJoin.mockResolvedValue("/tmp/client-id.txt");
-		mockTempDir.mockResolvedValue("/tmp");
-		mockWriteTextFile.mockResolvedValue(undefined);
-		mockShareFile.mockResolvedValue(undefined);
+		mockShareText.mockResolvedValue(undefined);
 	});
 
 	it("returns existing client id from localStorage", async () => {
@@ -96,7 +77,6 @@ describe("ClientId service", () => {
 			title: "Expiry Scanner Client ID",
 			text: "My Expiry Scanner Client ID: abc",
 		});
-		expect(mockShareFile).not.toHaveBeenCalled();
 	});
 
 	it("falls back to clipboard when navigator share is unavailable", async () => {
@@ -110,12 +90,11 @@ describe("ClientId service", () => {
 		const { shareClientId } = await import("./ClientId");
 		await shareClientId("fallback-id");
 		expect(writeText).toHaveBeenCalledWith("fallback-id");
-		expect(mockShareFile).not.toHaveBeenCalled();
 		expect(logSpy).toHaveBeenCalled();
 		logSpy.mockRestore();
 	});
 
-	it("uses native plugin when Web Share is unavailable in tauri", async () => {
+	it("uses sharesheet plugin when Web Share is unavailable in tauri", async () => {
 		const writeText = vi.fn().mockResolvedValue(undefined);
 		Object.defineProperty(globalThis, "navigator", {
 			value: {
@@ -129,12 +108,11 @@ describe("ClientId service", () => {
 		const { shareClientId } = await import("./ClientId");
 		await shareClientId("plugin-id");
 
-		expect(mockWriteTextFile).toHaveBeenCalled();
-		expect(mockShareFile).toHaveBeenCalledWith("/tmp/client-id.txt", "text/plain");
+		expect(mockShareText).toHaveBeenCalledWith("My Expiry Scanner Client ID: plugin-id");
 		expect(writeText).not.toHaveBeenCalled();
 	});
 
-	it("falls back to clipboard if Web Share and plugin share both fail", async () => {
+	it("falls back to clipboard if sharesheet and Web Share both fail", async () => {
 		const share = vi.fn().mockRejectedValue(new Error("web share fail"));
 		const writeText = vi.fn().mockResolvedValue(undefined);
 		Object.defineProperty(globalThis, "navigator", {
@@ -146,14 +124,93 @@ describe("ClientId service", () => {
 			configurable: true,
 		});
 		mockIsTauri.mockReturnValue(true);
-		mockShareFile.mockRejectedValueOnce(new Error("plugin share fail"));
+		mockShareText.mockRejectedValueOnce(new Error("sharesheet fail"));
 
 		const { shareClientId } = await import("./ClientId");
 		await shareClientId("fallback-after-failures");
 
+		expect(mockShareText).toHaveBeenCalled();
 		expect(share).toHaveBeenCalled();
-		expect(mockShareFile).toHaveBeenCalled();
 		expect(writeText).toHaveBeenCalledWith("fallback-after-failures");
+	});
+
+	it("falls back to legacy copy command when clipboard API write is denied", async () => {
+		const share = vi.fn().mockRejectedValue(new Error("web share fail"));
+		const writeText = vi.fn().mockRejectedValue(new Error("Write permission denied."));
+		const execCommand = vi.fn().mockReturnValue(true);
+		const textArea = {
+			value: "",
+			setAttribute: vi.fn(),
+			style: {},
+			focus: vi.fn(),
+			select: vi.fn(),
+		};
+		Object.defineProperty(globalThis, "document", {
+			value: {
+				createElement: vi.fn(() => textArea),
+				body: {
+					appendChild: vi.fn(),
+					removeChild: vi.fn(),
+				},
+				execCommand,
+			},
+			configurable: true,
+		});
+		Object.defineProperty(globalThis, "navigator", {
+			value: {
+				share,
+				userAgent: "Mozilla/5.0 (Linux; Android 14)",
+				clipboard: { writeText },
+			},
+			configurable: true,
+		});
+		mockIsTauri.mockReturnValue(true);
+		mockShareText.mockRejectedValueOnce(new Error("sharesheet fail"));
+
+		const { shareClientId } = await import("./ClientId");
+		await shareClientId("legacy-copy-id");
+
+		expect(writeText).toHaveBeenCalledWith("legacy-copy-id");
+		expect(execCommand).toHaveBeenCalledWith("copy");
+	});
+
+	it("throws when share and clipboard fallbacks all fail", async () => {
+		const share = vi.fn().mockRejectedValue(new Error("web share fail"));
+		const writeText = vi.fn().mockRejectedValue(new Error("Write permission denied."));
+		const execCommand = vi.fn().mockReturnValue(false);
+		const textArea = {
+			value: "",
+			setAttribute: vi.fn(),
+			style: {},
+			focus: vi.fn(),
+			select: vi.fn(),
+		};
+		Object.defineProperty(globalThis, "document", {
+			value: {
+				createElement: vi.fn(() => textArea),
+				body: {
+					appendChild: vi.fn(),
+					removeChild: vi.fn(),
+				},
+				execCommand,
+			},
+			configurable: true,
+		});
+		Object.defineProperty(globalThis, "navigator", {
+			value: {
+				share,
+				userAgent: "Mozilla/5.0 (Linux; Android 14)",
+				clipboard: { writeText },
+			},
+			configurable: true,
+		});
+		mockIsTauri.mockReturnValue(true);
+		mockShareText.mockRejectedValueOnce(new Error("sharesheet fail"));
+
+		const { shareClientId } = await import("./ClientId");
+		await expect(shareClientId("no-fallback-id")).rejects.toThrow(
+			"Unable to share or copy client ID on this device",
+		);
 	});
 
 	it("skips plugin on tauri desktop user-agent when Web Share exists", async () => {
@@ -173,7 +230,6 @@ describe("ClientId service", () => {
 		await shareClientId("desktop-fallback");
 
 		expect(share).toHaveBeenCalled();
-		expect(mockShareFile).not.toHaveBeenCalled();
 		expect(writeText).toHaveBeenCalledWith("desktop-fallback");
 	});
 });

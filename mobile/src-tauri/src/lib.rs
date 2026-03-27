@@ -41,6 +41,12 @@ fn calculate_days_left(expiry_date: String, format: String) -> Result<i64, Strin
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     info!("Initializing Tauri application runtime");
+    let log_level = if cfg!(debug_assertions) {
+        tauri_plugin_log::log::LevelFilter::Debug
+    } else {
+        tauri_plugin_log::log::LevelFilter::Info
+    };
+
     let builder = tauri::Builder::default()
         .plugin(
             tauri_plugin_log::Builder::new()
@@ -49,17 +55,17 @@ pub fn run() {
                     Target::new(TargetKind::LogDir { file_name: None }),
                     Target::new(TargetKind::Webview),
                 ])
-                .level(tauri_plugin_log::log::LevelFilter::Trace)
+                .level(log_level)
                 .build(),
         )
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_share::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![greet, calculate_days_left]);
 
     #[cfg(any(target_os = "android", target_os = "ios"))]
     let builder = builder
+        .plugin(tauri_plugin_sharesheet::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_barcode_scanner::init())
         .plugin(tauri_plugin_haptics::init());

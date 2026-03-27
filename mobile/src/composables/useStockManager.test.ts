@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { nextTick } from "vue";
 import type { Stock } from "../bindings/Stock";
@@ -18,10 +18,7 @@ const mockUpdateStock = vi.fn();
 const mockRemoveStockById = vi.fn();
 
 const mockIsTauri = vi.fn(() => false);
-const mockWriteTextFile = vi.fn();
-const mockTempDir = vi.fn().mockResolvedValue("/tmp");
-const mockJoin = vi.fn().mockResolvedValue("/tmp/list.txt");
-const mockShareFile = vi.fn();
+const mockShareText = vi.fn();
 const mockToastSuccess = vi.fn();
 const mockToastError = vi.fn();
 const mockToastShow = vi.fn().mockReturnValue(1);
@@ -43,9 +40,7 @@ vi.mock("/src/services/stocks.ts", () => ({
 	}),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ isTauri: mockIsTauri }));
-vi.mock("@tauri-apps/plugin-fs", () => ({ BaseDirectory: { Temp: "Temp" }, writeTextFile: mockWriteTextFile }));
-vi.mock("@tauri-apps/api/path", () => ({ tempDir: mockTempDir, join: mockJoin }));
-vi.mock("tauri-plugin-share", () => ({ shareFile: mockShareFile }));
+vi.mock("@buildyourwebapp/tauri-plugin-sharesheet", () => ({ shareText: mockShareText }));
 vi.mock("/src/services/toast.ts", () => ({
 	useToast: () => ({
 		success: mockToastSuccess,
@@ -86,6 +81,10 @@ describe("useStockManager", () => {
 			value: navigator,
 			configurable: true,
 		});
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
 	});
 
 	it("creates stock with validation and success reset", async () => {
@@ -213,11 +212,9 @@ describe("useStockManager", () => {
 			value: navigator,
 			configurable: true,
 		});
-		mockWriteTextFile.mockResolvedValueOnce(undefined);
-		mockShareFile.mockResolvedValueOnce(undefined);
+		mockShareText.mockResolvedValueOnce(undefined);
 		await mgr.shareGroceryList();
-		expect(mockWriteTextFile).toHaveBeenCalled();
-		expect(mockShareFile).toHaveBeenCalled();
+		expect(mockShareText).toHaveBeenCalled();
 
 		const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 		mockIsTauri.mockReturnValueOnce(true);
@@ -229,8 +226,7 @@ describe("useStockManager", () => {
 			value: navigator,
 			configurable: true,
 		});
-		mockWriteTextFile.mockResolvedValueOnce(undefined);
-		mockShareFile.mockRejectedValueOnce(new Error("native share fail"));
+		mockShareText.mockRejectedValueOnce(new Error("native share fail"));
 		await mgr.shareGroceryList();
 		expect(warnSpy).toHaveBeenCalled();
 		warnSpy.mockRestore();

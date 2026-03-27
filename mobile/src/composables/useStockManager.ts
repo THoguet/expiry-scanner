@@ -1,8 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { isTauri } from "@tauri-apps/api/core";
-import { join, tempDir } from "@tauri-apps/api/path";
-import { BaseDirectory, writeTextFile } from "@tauri-apps/plugin-fs";
-import { shareFile } from "tauri-plugin-share";
+import { shareText } from "@buildyourwebapp/tauri-plugin-sharesheet";
 import type { Stock } from "../bindings/Stock";
 import { useStocks } from "../services/stocks";
 import { useToast } from "../services/toast";
@@ -443,12 +441,7 @@ export function useStockManager() {
 			logger.debug("Sharing grocery list with native mobile share sheet", {
 				length: text.length,
 			});
-			const fileName = `grocery-list-${Date.now()}.txt`;
-			await writeTextFile(fileName, text, {
-				baseDir: BaseDirectory.Temp,
-			});
-			const tempPath = await join(await tempDir(), fileName);
-			await shareFile(tempPath, "text/plain");
+			await shareText(text);
 			return true;
 		} catch (shareError) {
 			logger.warn("Native share plugin failed, falling back", { error: shareError });
