@@ -14,13 +14,17 @@ import ClientIdModal from "./components/shared/ClientIdModal.vue";
 import ToastHost from "./components/shared/ToastHost.vue";
 import { updateNotifications } from "./services/notifications";
 import { useProducts } from "./services/products";
+import { logger } from "./services/logger";
 import { CLIENT_ID } from "./main";
 
 const showClientIdModal = ref(false);
 
 onMounted(async () => {
+	logger.info("App mounted, loading initial products", { clientId: CLIENT_ID });
 	await useProducts().loadProducts();
+	logger.debug("Initial products loaded", { count: useProducts().products.value.length });
 	updateNotifications(useProducts().products.value);
+	logger.info("Initial notifications update dispatched");
 });
 
 </script>

@@ -56,6 +56,7 @@
 import { ref, watch } from 'vue';
 import { setClientId, generateNewClientId, shareClientId } from '../../services/ClientId';
 import { useToast } from '../../services/toast';
+import { logger } from '../../services/logger';
 
 const emit = defineEmits<{ close: [] }>();
 
@@ -138,10 +139,11 @@ function applyCustomId() {
 async function shareCurrentId() {
 	shareLoading.value = true;
 	try {
+		logger.info('Sharing client ID from modal', { clientId: localClientId.value });
 		await shareClientId(localClientId.value);
 		toast.success('ID shared successfully');
 	} catch (error) {
-		console.error('Share failed:', error);
+		logger.error('Share client ID failed from modal', { error });
 		toast.error('Failed to share ID');
 	} finally {
 		shareLoading.value = false;

@@ -10,6 +10,7 @@ import { onBeforeUnmount, onMounted, ref, watch, watchEffect } from "vue";
 import type { ProductPrefill } from "../../bindings/ProductPrefill";
 import { CLIENT_ID } from "../../main";
 import { addProduct, useProducts } from "../../services/products";
+import { logger } from "../../services/logger";
 
 interface ProductInfo {
 	barCode: string;
@@ -93,10 +94,12 @@ export function useAddProductForm() {
 	});
 
 	onMounted(() => {
+		logger.info("Add product form mounted, starting scanner");
 		void startScan();
 	});
 
 	onBeforeUnmount(() => {
+		logger.info("Add product form unmounted, cancelling scanner");
 		cancelScan();
 		document.body.classList.toggle("scan-active", false);
 	});
@@ -147,7 +150,10 @@ export function useAddProductForm() {
 	async function createNewProduct(): Promise<void> {
 		const verificationResult = verifyProductInfo();
 		if (verificationResult !== true) {
-			console.warn("Product info is not valid:", verificationResult);
+			logger.warn("Product info validation failed", {
+				reason: verificationResult,
+				barcode: productInfo.value.barCode,
+			});
 			setAddError(verificationResult as string);
 			return;
 		}
@@ -155,6 +161,10 @@ export function useAddProductForm() {
 		isSubmitting.value = true;
 		try {
 			const imageBase64 = selectedImage.value ? await toBase64Payload(selectedImage.value) : null;
+			logger.info("Submitting new product", {
+				barcode: productInfo.value.barCode,
+				hasImage: Boolean(imageBase64),
+			});
 
 			await addProduct({
 				barcode: productInfo.value.barCode,
@@ -166,10 +176,16 @@ export function useAddProductForm() {
 			});
 
 			emit("productAdded");
+			logger.info("Product added from form", {
+				barcode: productInfo.value.barCode,
+			});
 			resetForm();
 			inputOrder[0].value?.focus();
 		} catch (error) {
-			console.error("Error creating product:", error);
+			logger.error("Error creating product from form", {
+				error,
+				barcode: productInfo.value.barCode,
+			});
 			setAddError("Failed to add product");
 		} finally {
 			isSubmitting.value = false;
@@ -301,12 +317,14 @@ export function useAddProductForm() {
 	}
 
 	function cancelScan(): void {
+		logger.debug("Cancelling barcode scan");
 		cancel();
 		scanning.value = false;
 	}
 
 	async function startScan(): Promise<void> {
 		scanError.value = null;
+		logger.debug("Starting barcode scan flow");
 		try {
 			let permissionState = await checkPermissions();
 
@@ -314,8 +332,10 @@ export function useAddProductForm() {
 				permissionState = await requestPermissions();
 			}
 
+			logger.debug("Barcode scanner permission state", { permissionState });
+
 			if (permissionState !== "granted") {
-				console.log("Camera permission not granted.");
+				logger.warn("Camera permission not granted");
 				scanError.value = "Camera permission not granted";
 				return;
 			}
@@ -323,9 +343,14 @@ export function useAddProductForm() {
 			scanning.value = true;
 			const result = await scan({ windowed: true, formats: [Format.EAN13, Format.EAN8] });
 			scanning.value = false;
+			logger.debug("Barcode scan finished", {
+				hasResult: Boolean(result),
+				format: result?.format,
+			});
 
 			if (result) {
 				if (result.format !== Format.EAN13 && result.format !== Format.EAN8) {
+					logger.warn("Scanned unsupported barcode format", { format: result.format });
 					scanError.value = "Scanned code is in invalid format (" + result.format + ")";
 					return;
 				}
@@ -334,17 +359,23 @@ export function useAddProductForm() {
 				await loadPrefill(result.content);
 			}
 		} catch (error) {
-			console.error("Error checking permissions or scanning:", error);
+			logger.error("Barcode scan failed", { error });
 			scanError.value = "Failed to scan barcode";
 		}
 	}
 
 	async function loadPrefill(barcode: string): Promise<void> {
 		prefilling.value = true;
+		logger.debug("Loading barcode prefill", { barcode });
 		try {
 			const { getPrefill } = useProducts(CLIENT_ID);
 			const prefillData = await getPrefill(barcode);
 			prefilled.value = prefillData;
+			logger.debug("Barcode prefill loaded", {
+				barcode,
+				source: prefillData.source,
+				hasName: Boolean(prefillData.name),
+			});
 
 			if (prefillData.name) {
 				productInfo.value.name = prefillData.name;
@@ -354,7 +385,10 @@ export function useAddProductForm() {
 				productNameInput.value?.focus();
 			}, 100);
 		} catch (error) {
-			console.error("Prefill lookup failed:", error);
+			logger.warn("Prefill lookup failed, using fallback", {
+				barcode,
+				error,
+			});
 			prefilled.value = {
 				barcode,
 				name: null,

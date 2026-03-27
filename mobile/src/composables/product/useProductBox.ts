@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import type { Barcode } from "../../bindings/Barcode";
 import type { Product } from "../../bindings/Product";
 import type { ProductWithBarcode } from "../../services/backend";
+import { logger } from "../../services/logger";
 
 const TIME_TO_DELETE_MS = 1400;
 const VIBRATION_START_DELAY_MS = 280;
@@ -79,9 +80,16 @@ export function useProductBox(
 		isLoadingDaysLeft.value = true;
 		daysLeftError.value = false;
 		try {
+			logger.trace("Calculating days left", {
+				productId: pro.value.id.toString(),
+				expirationDate: pro.value.expiration_date,
+			});
 			daysLeft.value = await getLeftDays(pro.value.expiration_date);
 		} catch (error) {
-			console.error("Error calculating days left:", error);
+			logger.error("Error calculating days left", {
+				productId: pro.value.id.toString(),
+				error,
+			});
 			daysLeft.value = null;
 			daysLeftError.value = true;
 		} finally {

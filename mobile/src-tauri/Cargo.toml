@@ -27,6 +27,7 @@ chrono = "0.4.44"
 tauri-plugin-share = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-log = "2"
+log = "0.4"
 
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 tauri-plugin-barcode-scanner = "2"

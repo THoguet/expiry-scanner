@@ -3,6 +3,7 @@ import type { EditProduct as EditProductType } from "../../bindings/EditProduct"
 import { CLIENT_ID } from "../../main";
 import type { ProductWithBarcode } from "../../services/backend";
 import { removeProduct, saveEditedProduct, useProducts } from "../../services/products";
+import { logger } from "../../services/logger";
 
 export function useEditProductForm(
 	product: ProductWithBarcode,
@@ -77,12 +78,18 @@ export function useEditProductForm(
 		onClose();
 
 		try {
+			logger.info("Deleting product from edit form", {
+				productId: editedProduct.value.id.toString(),
+			});
 			await removeProduct({
 				id: editedProduct.value.id,
 				client_id: editedProduct.value.client_id,
 			});
 		} catch (error) {
-			console.error("Failed to delete product:", error);
+			logger.error("Failed to delete product from edit form", {
+				productId: editedProduct.value.id.toString(),
+				error,
+			});
 		}
 	}
 
@@ -96,6 +103,10 @@ export function useEditProductForm(
 		saveError.value = null;
 
 		try {
+			logger.info("Saving product from edit form", {
+				productId: editedProduct.value.id.toString(),
+				barcode: editedProduct.value.barcode,
+			});
 			await saveEditedProduct(editedProduct.value);
 
 			if (selectedImage.value) {
@@ -103,13 +114,19 @@ export function useEditProductForm(
 					const { uploadImage } = useProducts(CLIENT_ID);
 					await uploadImage(editedProduct.value.barcode, selectedImage.value);
 				} catch (imgError) {
-					console.warn("Image upload failed (non-blocking):", imgError);
+					logger.warn("Image upload failed from edit form (non-blocking)", {
+						productId: editedProduct.value.id.toString(),
+						error: imgError,
+					});
 				}
 			}
 
 			onClose();
 		} catch (error) {
-			console.error("Failed to save product:", error);
+			logger.error("Failed to save product from edit form", {
+				productId: editedProduct.value.id.toString(),
+				error,
+			});
 			saveError.value = "Failed to save product";
 		} finally {
 			isSaving.value = false;

@@ -10,6 +10,7 @@ import type { CreateStock } from "../bindings/CreateStock";
 import type { EditStock } from "../bindings/EditStock";
 import type { DeleteStock } from "../bindings/DeleteStock";
 import type { AdjustStockDelta } from "../bindings/AdjustStockDelta";
+import { logger } from "./logger";
 
 const DEFAULT_BACKEND_URL = "https://expiry.nessar.fr";
 
@@ -36,34 +37,80 @@ function stringifyPayload(payload: unknown): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T | undefined> {
-	const response = await fetch(`${getBaseUrl()}${path}`, {
-		headers: {
-			"Content-Type": "application/json",
-			...(init?.headers ?? {}),
-		},
-		...init,
+	const baseUrl = getBaseUrl();
+	const url = `${baseUrl}${path}`;
+	const method = init?.method ?? "GET";
+	const startedAt = Date.now();
+
+	logger.trace("Backend request started", {
+		method,
+		path,
+		url,
 	});
 
-	if (!response.ok) {
-		const body = await response.text();
-		throw new Error(`Backend request failed (${response.status}): ${body}`);
-	}
+	try {
+		const response = await fetch(url, {
+			headers: {
+				"Content-Type": "application/json",
+				...(init?.headers ?? {}),
+			},
+			...init,
+		});
 
-	if (response.status === 204) {
-		return undefined;
-	}
+		if (!response.ok) {
+			const body = await response.text();
+			const durationMs = Date.now() - startedAt;
+			logger.error("Backend request failed", {
+				method,
+				path,
+				status: response.status,
+				durationMs,
+				body,
+			});
+			throw new Error(`Backend request failed (${response.status}): ${body}`);
+		}
 
-	return response.json() as Promise<T>;
+		if (response.status === 204) {
+			logger.debug("Backend request completed with no content", {
+				method,
+				path,
+				durationMs: Date.now() - startedAt,
+			});
+			return undefined;
+		}
+
+		const payload = (await response.json()) as T;
+		logger.trace("Backend request succeeded", {
+			method,
+			path,
+			status: response.status,
+			durationMs: Date.now() - startedAt,
+		});
+		return payload;
+	} catch (error) {
+		logger.error("Backend request raised an exception", {
+			method,
+			path,
+			durationMs: Date.now() - startedAt,
+			error,
+		});
+		throw error;
+	}
 }
 
 
 export async function getProducts(clientId: string): Promise<Product[]> {
+	logger.debug("Loading products", { clientId });
 	const products = await request<Product[]>(`/products?client_id=${encodeURIComponent(clientId)}`);
 	if (!products) return [];
 	return products;
 }
 
 export async function createProduct(payload: CreateProduct): Promise<Product> {
+	logger.info("Creating product", {
+		barcode: payload.barcode,
+		clientId: payload.client_id,
+	});
 	const created = await request<Product>("/products", {
 		method: "POST",
 		body: stringifyPayload(payload),
@@ -77,6 +124,10 @@ export async function createProduct(payload: CreateProduct): Promise<Product> {
 }
 
 export async function deleteProduct(payload: DeleteProduct): Promise<void> {
+	logger.info("Deleting product", {
+		productId: payload.id.toString(),
+		clientId: payload.client_id,
+	});
 	await request<void>("/products", {
 		method: "DELETE",
 		body: stringifyPayload(payload),
@@ -84,6 +135,11 @@ export async function deleteProduct(payload: DeleteProduct): Promise<void> {
 }
 
 export async function editProduct(payload: EditProduct): Promise<Product> {
+	logger.info("Editing product", {
+		productId: payload.id.toString(),
+		barcode: payload.barcode,
+		clientId: payload.client_id,
+	});
 	const updated = await request<Product>("/products", {
 		method: "PUT",
 		body: stringifyPayload(payload),
@@ -99,6 +155,7 @@ export async function editProduct(payload: EditProduct): Promise<Product> {
 export type ProductWithBarcode = [Product, Barcode | null];
 
 export async function getProductsWithBarcode(clientId: string): Promise<ProductWithBarcode[]> {
+	logger.debug("Loading products with barcode", { clientId });
 	const products = await request<ProductWithBarcode[]>(`/products/with-barcode?client_id=${encodeURIComponent(clientId)}`);
 	if (!products) return [];
 	return products;
@@ -108,6 +165,7 @@ export async function getProductPrefill(
 	barcode: string,
 	clientId: string,
 ): Promise<ProductPrefill> {
+	logger.debug("Loading product prefill", { barcode, clientId });
 	const prefill = await request<ProductPrefill>(
 		`/products/prefill/${encodeURIComponent(barcode)}?client_id=${encodeURIComponent(clientId)}`,
 	);
@@ -124,6 +182,11 @@ export async function uploadProductImage(
 	clientId: string,
 	imageFile: File,
 ): Promise<UploadProductImageResponse> {
+	logger.info("Uploading product image", {
+		barcode,
+		clientId,
+		sizeBytes: imageFile.size,
+	});
 	const formData = new FormData();
 	formData.append("image", imageFile);
 
@@ -138,20 +201,36 @@ export async function uploadProductImage(
 
 	if (!response.ok) {
 		const body = await response.text();
+		logger.error("Image upload failed", {
+			barcode,
+			clientId,
+			status: response.status,
+			body,
+		});
 		throw new Error(`Image upload failed (${response.status}): ${body}`);
 	}
 
 	const result = (await response.json()) as UploadProductImageResponse;
+	logger.debug("Image upload succeeded", {
+		barcode,
+		clientId,
+		imageUrl: result.image,
+	});
 	return result;
 }
 
 export async function getStocks(clientId: string): Promise<Stock[]> {
+	logger.debug("Loading stocks", { clientId });
 	const stocks = await request<Stock[]>(`/stock?client_id=${encodeURIComponent(clientId)}`);
 	if (!stocks) return [];
 	return stocks;
 }
 
 export async function createStock(payload: CreateStock): Promise<Stock> {
+	logger.info("Creating stock", {
+		name: payload.name,
+		clientId: payload.client_id,
+	});
 	const created = await request<Stock>("/stock", {
 		method: "POST",
 		body: stringifyPayload(payload),
@@ -165,6 +244,11 @@ export async function createStock(payload: CreateStock): Promise<Stock> {
 }
 
 export async function editStock(payload: EditStock): Promise<Stock | undefined> {
+	logger.info("Editing stock", {
+		stockId: payload.id.toString(),
+		name: payload.name,
+		clientId: payload.client_id,
+	});
 	const updated = await request<Stock>("/stock", {
 		method: "PUT",
 		body: stringifyPayload(payload),
@@ -174,6 +258,10 @@ export async function editStock(payload: EditStock): Promise<Stock | undefined> 
 }
 
 export async function deleteStock(payload: DeleteStock): Promise<void> {
+	logger.info("Deleting stock", {
+		stockId: payload.id.toString(),
+		clientId: payload.client_id,
+	});
 	await request<void>("/stock", {
 		method: "DELETE",
 		body: stringifyPayload(payload),
@@ -181,6 +269,11 @@ export async function deleteStock(payload: DeleteStock): Promise<void> {
 }
 
 export async function adjustStockByDelta(stockId: Stock["id"], payload: AdjustStockDelta): Promise<Stock> {
+	logger.debug("Adjusting stock by delta", {
+		stockId: stockId.toString(),
+		delta: payload.delta,
+		clientId: payload.client_id,
+	});
 	const updated = await request<Stock>(`/stock/${encodeURIComponent(stockId.toString())}/delta`, {
 		method: "POST",
 		body: stringifyPayload(payload),

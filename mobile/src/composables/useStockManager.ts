@@ -6,6 +6,7 @@ import { shareFile } from "tauri-plugin-share";
 import type { Stock } from "../bindings/Stock";
 import { useStocks } from "../services/stocks";
 import { useToast } from "../services/toast";
+import { logger } from "../services/logger";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -33,8 +34,10 @@ export function useStockManager() {
 	});
 
 	onMounted(async () => {
+		logger.info("Stock manager mounted, loading stocks");
 		await loadStocks();
 		resetDisplayOrder();
+		logger.debug("Stock manager ready", { count: stocks.value.length });
 	});
 
 	watch(error, (nextError, prevError) => {
@@ -158,6 +161,10 @@ export function useStockManager() {
 			pendingSaves.delete(key);
 			const savingToastId = toast.show("Saving stock changes...", "success");
 			try {
+				logger.debug("Debounced stock save started", {
+					stockId: stock.id.toString(),
+					name: stock.name,
+				});
 				await updateStock(
 					stock.id,
 					{
@@ -173,7 +180,10 @@ export function useStockManager() {
 				clearSaveFeedbackLater(stock.id);
 				toast.success("Stock line saved");
 			} catch (saveError) {
-				console.error(saveError);
+				logger.error("Debounced stock save failed", {
+					stockId: stock.id.toString(),
+					error: saveError,
+				});
 				setLineSaveState(stock.id, "error");
 				clearSaveFeedbackLater(stock.id, 2200);
 				toast.error("Oops, failed to save stock changes");
@@ -223,10 +233,12 @@ export function useStockManager() {
 		try {
 			const name = normalizeRequiredText(newStock.value.name);
 			if (!name) {
+				logger.warn("Create stock rejected because name is empty");
 				toast.error("Name is required");
 				return;
 			}
 
+			logger.info("Creating new stock from manager", { name });
 			await addStock({
 				name,
 				desired_quantity: normalizeQuantity(newStock.value.desired_quantity),
@@ -245,7 +257,7 @@ export function useStockManager() {
 			resetDisplayOrder();
 			toast.success("Nice! Stock line added");
 		} catch (saveError) {
-			console.error(saveError);
+			logger.error("Failed to create stock from manager", { error: saveError });
 			toast.error("Oops, failed to add stock line");
 		} finally {
 			creatingStock.value = false;
@@ -263,12 +275,19 @@ export function useStockManager() {
 		try {
 			const name = normalizeRequiredText(stock.name);
 			if (!name) {
+				logger.warn("Manual stock save rejected because name is empty", {
+					stockId: stock.id.toString(),
+				});
 				toast.error("Name is required");
 				setLineSaveState(stock.id, "error");
 				clearSaveFeedbackLater(stock.id, 2200);
 				return;
 			}
 
+			logger.debug("Manual stock save started", {
+				stockId: stock.id.toString(),
+				name,
+			});
 			await updateStock(
 				stock.id,
 				{
@@ -284,7 +303,10 @@ export function useStockManager() {
 			clearSaveFeedbackLater(stock.id);
 			toast.success("Sweet! Stock line saved");
 		} catch (saveError) {
-			console.error(saveError);
+			logger.error("Manual stock save failed", {
+				stockId: stock.id.toString(),
+				error: saveError,
+			});
 			setLineSaveState(stock.id, "error");
 			clearSaveFeedbackLater(stock.id, 2200);
 			toast.error("Oops, failed to save stock line");
@@ -294,9 +316,16 @@ export function useStockManager() {
 	async function increment(stock: Stock): Promise<void> {
 		try {
 			stock.current_quantity = normalizeQuantity(stock.current_quantity + 1);
+			logger.trace("Incremented stock locally", {
+				stockId: stock.id.toString(),
+				currentQuantity: stock.current_quantity,
+			});
 			queueDebouncedSave(stock);
 		} catch (adjustError) {
-			console.error(adjustError);
+			logger.error("Failed to increment stock", {
+				stockId: stock.id.toString(),
+				error: adjustError,
+			});
 			toast.error("Oops, failed to increase stock");
 		}
 	}
@@ -304,15 +333,23 @@ export function useStockManager() {
 	async function decrement(stock: Stock): Promise<void> {
 		try {
 			stock.current_quantity = normalizeQuantity(stock.current_quantity - 1);
+			logger.trace("Decremented stock locally", {
+				stockId: stock.id.toString(),
+				currentQuantity: stock.current_quantity,
+			});
 			queueDebouncedSave(stock);
 		} catch (adjustError) {
-			console.error(adjustError);
+			logger.error("Failed to decrement stock", {
+				stockId: stock.id.toString(),
+				error: adjustError,
+			});
 			toast.error("Oops, failed to decrease stock");
 		}
 	}
 
 	async function remove(stockId: Stock["id"]): Promise<void> {
 		try {
+			logger.info("Removing stock from manager", { stockId: stockId.toString() });
 			await removeStockById(stockId);
 			const key = getStockKey(stockId);
 			const nextDetailedView = { ...detailedLineView.value };
@@ -326,7 +363,10 @@ export function useStockManager() {
 			resetDisplayOrder();
 			toast.success("Done! Stock line deleted");
 		} catch (deleteError) {
-			console.error(deleteError);
+			logger.error("Failed to delete stock from manager", {
+				stockId: stockId.toString(),
+				error: deleteError,
+			});
 			toast.error("Oops, failed to delete stock line");
 		}
 	}
@@ -385,16 +425,24 @@ export function useStockManager() {
 		].join("\n");
 	}
 
-	function isTauriMobile(): boolean {
+	function shouldAttemptNativeSharePlugin(): boolean {
 		if (!isTauri()) return false;
+
 		const userAgent = window.navigator.userAgent.toLowerCase();
-		return userAgent.includes("android") || userAgent.includes("iphone") || userAgent.includes("ipad");
+		const looksMobileUserAgent = userAgent.includes("android") || userAgent.includes("iphone") || userAgent.includes("ipad");
+		const hasWebShare = typeof navigator.share === "function";
+
+		// Some Android webviews hide mobile markers or Web Share; keep plugin path available.
+		return looksMobileUserAgent || !hasWebShare;
 	}
 
 	async function shareWithNativeMobileSheet(text: string): Promise<boolean> {
-		if (!isTauriMobile()) return false;
+		if (!shouldAttemptNativeSharePlugin()) return false;
 
 		try {
+			logger.debug("Sharing grocery list with native mobile share sheet", {
+				length: text.length,
+			});
 			const fileName = `grocery-list-${Date.now()}.txt`;
 			await writeTextFile(fileName, text, {
 				baseDir: BaseDirectory.Temp,
@@ -403,7 +451,7 @@ export function useStockManager() {
 			await shareFile(tempPath, "text/plain");
 			return true;
 		} catch (shareError) {
-			console.warn("Native share plugin failed, falling back", shareError);
+			logger.warn("Native share plugin failed, falling back", { error: shareError });
 			return false;
 		}
 	}
@@ -412,6 +460,10 @@ export function useStockManager() {
 		shareLoading.value = true;
 
 		const text = buildGroceryText();
+		logger.info("Sharing grocery list", {
+			lines: text.split("\n").length,
+			length: text.length,
+		});
 		try {
 			if (await shareWithNativeMobileSheet(text)) {
 				toast.success("Nice! Grocery list shared");
@@ -430,7 +482,7 @@ export function useStockManager() {
 			await navigator.clipboard.writeText(text);
 			toast.success("Nice! Grocery list copied to clipboard");
 		} catch (shareError) {
-			console.error(shareError);
+			logger.error("Failed to share grocery list", { error: shareError });
 			toast.error("Oops, failed to share grocery list");
 		} finally {
 			shareLoading.value = false;

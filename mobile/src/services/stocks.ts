@@ -10,6 +10,7 @@ import {
 	editStock,
 	getStocks,
 } from "./backend";
+import { logger } from "./logger";
 
 const stocks = ref<Stock[]>([]);
 const loading = ref(false);
@@ -32,8 +33,9 @@ export function useStocks(clientId: string = CLIENT_ID) {
 
 		try {
 			stocks.value = await getStocks(clientId);
+			logger.debug("Stocks loaded into state", { clientId, count: stocks.value.length });
 		} catch (backendError) {
-			console.error(backendError);
+			logger.error("Failed to load stocks", backendError);
 			error.value = "Failed to load stocks";
 		} finally {
 			loading.value = false;
@@ -45,11 +47,16 @@ export function useStocks(clientId: string = CLIENT_ID) {
 	}
 
 	async function addStock(payload: Omit<CreateStock, "client_id">): Promise<Stock> {
+		logger.info("Adding stock", {
+			name: payload.name,
+			clientId,
+		});
 		const createdStock = await createStock({
 			...payload,
 			client_id: clientId,
 		});
 		await refreshStocks();
+		logger.info("Stock created", { stockId: createdStock.id.toString(), clientId });
 		return createdStock;
 	}
 
@@ -59,6 +66,11 @@ export function useStocks(clientId: string = CLIENT_ID) {
 		options: { refresh?: boolean } = {},
 	): Promise<Stock> {
 		const { refresh = true } = options;
+		logger.debug("Updating stock", {
+			stockId: stockId.toString(),
+			clientId,
+			refresh,
+		});
 		const updatedStock = await editStock({
 			id: stockId,
 			...payload,
@@ -96,19 +108,30 @@ export function useStocks(clientId: string = CLIENT_ID) {
 	}
 
 	async function removeStockById(stockId: Stock["id"]): Promise<void> {
+		logger.info("Removing stock", { stockId: stockId.toString(), clientId });
 		await deleteStock({
 			id: stockId,
 			client_id: clientId,
 		});
 		await refreshStocks();
+		logger.info("Stock removed", { stockId: stockId.toString(), clientId });
 	}
 
 	async function adjustStockQuantity(stockId: Stock["id"], delta: number): Promise<Stock> {
+		logger.debug("Adjusting stock quantity", {
+			stockId: stockId.toString(),
+			delta,
+			clientId,
+		});
 		const updatedStock = await adjustStockByDelta(stockId, {
 			client_id: clientId,
 			delta,
 		});
 		await refreshStocks();
+		logger.debug("Stock quantity adjusted", {
+			stockId: updatedStock.id.toString(),
+			currentQuantity: updatedStock.current_quantity,
+		});
 		return updatedStock;
 	}
 

@@ -1,6 +1,7 @@
 import { cancel, isPermissionGranted, Options, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import { Product } from "../bindings/Product";
 import { ProductWithBarcode } from "./backend";
+import { logger } from "./logger";
 
 const trackedPendingNotificationIds = new Set<number>();
 
@@ -10,9 +11,14 @@ export function getTrackedPendingNotificationIds(): number[] {
 
 export async function checkPermissions(): Promise<boolean> {
 	let permissionGranted = await isPermissionGranted();
+	logger.debug("Notification permission checked", { permissionGranted });
 	if (!permissionGranted) {
 		const permission = await requestPermission();
 		permissionGranted = permission === 'granted';
+		logger.info("Notification permission requested", {
+			response: permission,
+			permissionGranted,
+		});
 	}
 	return permissionGranted;
 }
@@ -34,17 +40,23 @@ function hashString(str: string): number {
 }
 
 export async function updateNotifications(products: ProductWithBarcode[]) {
+	logger.info("Updating product notifications", {
+		productsCount: products.length,
+		trackedCount: trackedPendingNotificationIds.size,
+	});
 	const productsWithIds = new Map<ProductWithBarcode, number[]>(products.map((p) => [p, generateNotificationId(p[0])]));
 	const productsWithIdsSet = new Set<number>(Array.from(productsWithIds.values()).flat());
 
 	const notificationsToCancelIds = Array.from(trackedPendingNotificationIds).filter((id) => !productsWithIdsSet.has(id));
 	if (notificationsToCancelIds.length > 0) {
+		logger.debug("Cancelling stale notifications", { ids: notificationsToCancelIds });
 		await cancel(notificationsToCancelIds);
 	}
 	notificationsToCancelIds.forEach((id) => trackedPendingNotificationIds.delete(id));
 
 	const hasPermission = await checkPermissions();
 	if (!hasPermission) {
+		logger.warn("Skipping notifications because permission is not granted");
 		return;
 	}
 
@@ -52,22 +64,37 @@ export async function updateNotifications(products: ProductWithBarcode[]) {
 	for (const product of notificationsToCreate) {
 		const notificationOptions = createNotificationForProduct(product, productsWithIds.get(product));
 		for (const notificationOption of notificationOptions) {
+			logger.trace("Scheduling notification", {
+				id: notificationOption.id,
+				title: notificationOption.title,
+				scheduledAt: notificationOption.schedule?.at?.date,
+			});
 			sendNotification(notificationOption);
 			if (notificationOption.id !== undefined) {
 				trackedPendingNotificationIds.add(notificationOption.id);
 			}
 		}
 	}
-	console.log("tracked pending notification ids:", getTrackedPendingNotificationIds());
+	logger.debug("Tracked pending notification IDs", {
+		ids: getTrackedPendingNotificationIds(),
+	});
 }
 
 export async function cancelNotificationsForProduct(product: Product): Promise<void> {
 	const notificationIds = generateNotificationId(product);
+	logger.info("Cancelling notifications for product", {
+		productId: product.id.toString(),
+		notificationIds,
+	});
 	await cancel(notificationIds);
 	notificationIds.forEach((id) => trackedPendingNotificationIds.delete(id));
 }
 
 export async function addNewProductNotification(product: ProductWithBarcode) {
+	logger.info("Adding notifications for new product", {
+		productId: product[0].id.toString(),
+		barcode: product[0].barcode,
+	});
 	const notificationOptions = createNotificationForProduct(product);
 	for (const notificationOption of notificationOptions) {
 		sendNotification(notificationOption);

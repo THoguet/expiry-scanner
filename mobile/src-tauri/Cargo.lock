@@ -1052,6 +1052,7 @@ name = "expiry_scanner"
 version = "0.2.1"
 dependencies = [
  "chrono",
+ "log",
  "serde",
  "serde_json",
  "tauri",
