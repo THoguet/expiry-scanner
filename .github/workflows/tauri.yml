@@ -174,5 +174,4 @@ jobs:
 
             ## Install
             **Android**: download the `.apk` below and sideload it.
-          draft: true
           files: mobile/src-tauri/gen/android/app/build/outputs/**/*.apk
