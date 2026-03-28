@@ -17,6 +17,7 @@ class MainActivity : TauriActivity() {
         WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
       )
     } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      @Suppress("DEPRECATION")
       window.decorView.systemUiVisibility =
         window.decorView.systemUiVisibility or android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
     }
