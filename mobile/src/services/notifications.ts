@@ -1,12 +1,44 @@
-import { cancel, isPermissionGranted, Options, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
+import { cancel, isPermissionGranted, Options, requestPermission, sendNotification, onAction } from "@tauri-apps/plugin-notification";
 import { Product } from "../bindings/Product";
 import { ProductWithBarcode } from "./backend";
 import { logger } from "./logger";
+import { shareProductExpiryAlert } from "./share";
 
 const trackedPendingNotificationIds = new Set<number>();
+const notificationToProductMap = new Map<number, Product>();
 
 export function getTrackedPendingNotificationIds(): number[] {
 	return Array.from(trackedPendingNotificationIds);
+}
+
+// Set up listener for notification actions (e.g., share button click)
+let actionListenerInitialized = false;
+
+function initializeActionListener() {
+	if (actionListenerInitialized) return;
+	actionListenerInitialized = true;
+
+	onAction((notification: any) => {
+		// When a notification action is triggered, the notification object is passed
+		const notificationId = notification.id as number | undefined;
+
+		logger.debug("Notification action triggered", {
+			notificationId,
+		});
+
+		// Try to find the product associated with this notification
+		if (notificationId !== undefined) {
+			const product = notificationToProductMap.get(notificationId);
+			if (product) {
+				shareProductExpiryAlert(product).catch((error) => {
+					logger.error("Failed to share product from notification", {
+						productId: product.id.toString(),
+						error,
+					});
+				});
+			}
+		}
+	});
 }
 
 export async function checkPermissions(): Promise<boolean> {
@@ -20,6 +52,12 @@ export async function checkPermissions(): Promise<boolean> {
 			permissionGranted,
 		});
 	}
+
+	// Initialize action listener once permissions are granted
+	if (permissionGranted) {
+		initializeActionListener();
+	}
+
 	return permissionGranted;
 }
 
@@ -52,7 +90,10 @@ export async function updateNotifications(products: ProductWithBarcode[]) {
 		logger.debug("Cancelling stale notifications", { ids: notificationsToCancelIds });
 		await cancel(notificationsToCancelIds);
 	}
-	notificationsToCancelIds.forEach((id) => trackedPendingNotificationIds.delete(id));
+	notificationsToCancelIds.forEach((id) => {
+		trackedPendingNotificationIds.delete(id);
+		notificationToProductMap.delete(id);
+	});
 
 	const hasPermission = await checkPermissions();
 	if (!hasPermission) {
@@ -69,6 +110,10 @@ export async function updateNotifications(products: ProductWithBarcode[]) {
 				title: notificationOption.title,
 				scheduledAt: notificationOption.schedule?.at?.date,
 			});
+			// Store product reference for share action
+			if (notificationOption.id !== undefined) {
+				notificationToProductMap.set(notificationOption.id, product[0]);
+			}
 			sendNotification(notificationOption);
 			if (notificationOption.id !== undefined) {
 				trackedPendingNotificationIds.add(notificationOption.id);
@@ -87,7 +132,10 @@ export async function cancelNotificationsForProduct(product: Product): Promise<v
 		notificationIds,
 	});
 	await cancel(notificationIds);
-	notificationIds.forEach((id) => trackedPendingNotificationIds.delete(id));
+	notificationIds.forEach((id) => {
+		trackedPendingNotificationIds.delete(id);
+		notificationToProductMap.delete(id);
+	});
 }
 
 export async function addNewProductNotification(product: ProductWithBarcode) {
@@ -97,6 +145,10 @@ export async function addNewProductNotification(product: ProductWithBarcode) {
 	});
 	const notificationOptions = createNotificationForProduct(product);
 	for (const notificationOption of notificationOptions) {
+		// Store product reference for share action
+		if (notificationOption.id !== undefined) {
+			notificationToProductMap.set(notificationOption.id, product[0]);
+		}
 		sendNotification(notificationOption);
 		if (notificationOption.id !== undefined) {
 			trackedPendingNotificationIds.add(notificationOption.id);
@@ -124,8 +176,10 @@ function createNotificationForProduct(product: ProductWithBarcode, notifications
 		notificationDate.setDate(expiryDate.getDate() - reminder.daysBeforeExpiry);
 		notificationDate.setHours(9, 0, 0, 0);
 
+		const notificationId = notificationsId[index];
+
 		return {
-			id: notificationsId[index],
+			id: notificationId,
 			title,
 			body: reminder.message,
 			largeBody: reminder.message,
@@ -138,6 +192,13 @@ function createNotificationForProduct(product: ProductWithBarcode, notifications
 				every: undefined,
 				interval: undefined,
 			},
-		};
+			// Add share action button to notification (Android/iOS)
+			actions: [
+				{
+					id: "share",
+					title: "Share",
+				},
+			],
+		} as Options;
 	});
 }
