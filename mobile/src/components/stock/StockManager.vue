@@ -1,6 +1,6 @@
 <template>
 	<section class="stock-page app-container">
-		<StockPageHeader :share-loading="shareLoading" @share="shareGroceryList" />
+		<StockPageHeader @share="shareGroceryList" />
 
 		<form class="new-stock-form" @submit.prevent="createNewStock">
 			<label>
@@ -53,7 +53,6 @@ const {
 	stocks,
 	loading,
 	creatingStock,
-	shareLoading,
 	searchQuery,
 	filteredStocks,
 	newStock,

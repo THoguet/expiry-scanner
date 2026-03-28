@@ -8,8 +8,8 @@
 			<p>Track shortages and restock quickly</p>
 		</div>
 		<div class="header-actions">
-			<button type="button" class="share-btn" :disabled="shareLoading" @click="emit('share')">
-				{{ shareLoading ? 'Sharing...' : 'Share grocery list' }}
+			<button type="button" class="share-btn" @click="emit('share')">
+				Share grocery list
 			</button>
 		</div>
 	</header>
@@ -18,10 +18,6 @@
 <script setup lang="ts">
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { faBoxesStacked } from "@fortawesome/free-solid-svg-icons";
-
-defineProps<{
-	shareLoading: boolean;
-}>();
 
 const emit = defineEmits<{
 	share: [];

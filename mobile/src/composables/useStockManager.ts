@@ -13,7 +13,6 @@ export function useStockManager() {
 	const toast = useToast();
 
 	const creatingStock = ref(false);
-	const shareLoading = ref(false);
 	const searchQuery = ref("");
 	const displayOrder = ref<Stock["id"][]>([]);
 	const detailedLineView = ref<Record<string, boolean>>({});
@@ -450,8 +449,6 @@ export function useStockManager() {
 	}
 
 	async function shareGroceryList(): Promise<void> {
-		shareLoading.value = true;
-
 		const text = buildGroceryText();
 		logger.info("Sharing grocery list", {
 			lines: text.split("\n").length,
@@ -477,8 +474,6 @@ export function useStockManager() {
 		} catch (shareError) {
 			logger.error("Failed to share grocery list", { error: shareError });
 			toast.error("Oops, failed to share grocery list");
-		} finally {
-			shareLoading.value = false;
 		}
 	}
 
@@ -487,7 +482,6 @@ export function useStockManager() {
 		loading,
 		error,
 		creatingStock,
-		shareLoading,
 		searchQuery,
 		filteredStocks,
 		newStock,

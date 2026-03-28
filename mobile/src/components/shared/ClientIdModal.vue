@@ -40,7 +40,7 @@
 				<!-- Action Buttons -->
 				<div class="action-buttons">
 					<button type="button" class="btn-share" @click="shareCurrentId">
-						{{ shareLoading ? 'Sharing...' : 'Share ID' }}
+						Share ID
 					</button>
 					<button type="button" class="btn-reset" @click="resetToNewId">
 						Generate New ID
@@ -67,7 +67,6 @@ const props = defineProps<{
 
 const localClientId = ref(props.currentClientId);
 const customInput = ref('');
-const shareLoading = ref(false);
 const toast = useToast();
 
 watch(() => props.currentClientId, (newId) => {
@@ -86,7 +85,6 @@ function closeModal() {
 
 function resetForm() {
 	customInput.value = '';
-	shareLoading.value = false;
 }
 
 function clearCustomInput() {
@@ -137,7 +135,6 @@ function applyCustomId() {
 }
 
 async function shareCurrentId() {
-	shareLoading.value = true;
 	try {
 		logger.info('Sharing client ID from modal', { clientId: localClientId.value });
 		await shareClientId(localClientId.value);
@@ -145,8 +142,6 @@ async function shareCurrentId() {
 	} catch (error) {
 		logger.error('Share client ID failed from modal', { error });
 		toast.error('Failed to share ID');
-	} finally {
-		shareLoading.value = false;
 	}
 }
 
