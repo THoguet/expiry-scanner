@@ -20,26 +20,7 @@
 			<p class="stock-meta">{{ quantitySummary }}</p>
 
 			<div class="stock-fields">
-				<label>
-					Name
-					<input v-model="stock.name" type="text" maxlength="80" placeholder="Item name" required />
-				</label>
-				<label>
-					Desired quantity
-					<input v-model.number="stock.desired_quantity" type="number" min="0" />
-				</label>
-				<label>
-					Current quantity
-					<input v-model.number="stock.current_quantity" type="number" min="0" />
-				</label>
-				<label>
-					Unit
-					<input v-model="stock.unit" type="text" maxlength="4" placeholder="pcs, kg..." />
-				</label>
-				<label>
-					Location
-					<input v-model="stock.location" type="text" maxlength="40" placeholder="fridge, pantry..." />
-				</label>
+				<StockFormFields :model="stock" />
 			</div>
 
 			<div class="actions-row">
@@ -54,6 +35,7 @@
 
 <script setup lang="ts">
 import type { Stock } from "../../bindings/Stock";
+import StockFormFields from "./StockFormFields.vue";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -218,23 +200,6 @@ function onCardClick(event: MouseEvent): void {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
 	gap: 0.5rem;
-}
-
-.stock-fields label {
-	display: flex;
-	flex-direction: column;
-	gap: 0.35rem;
-	font-size: 0.85rem;
-}
-
-.stock-fields input {
-	width: 100%;
-	box-sizing: border-box;
-	padding: 0.45rem 0.55rem;
-	border-radius: 0.55rem;
-	border: 1px solid var(--surface-border);
-	background: var(--surface-strong);
-	color: var(--text-primary);
 }
 
 .actions-row {

@@ -3,26 +3,8 @@
 		<StockPageHeader @share="shareGroceryList" />
 
 		<form class="new-stock-form" @submit.prevent="createNewStock">
-			<label>
-				Name
-				<input v-model="newStock.name" type="text" maxlength="80" placeholder="Rice" required />
-			</label>
-			<label>
-				Desired quantity
-				<input v-model.number="newStock.desired_quantity" type="number" min="0" placeholder="4" required />
-			</label>
-			<label>
-				Current quantity
-				<input v-model.number="newStock.current_quantity" type="number" min="0" placeholder="1" required />
-			</label>
-			<label>
-				Unit
-				<input v-model="newStock.unit" type="text" maxlength="4" placeholder="pcs, kg..." />
-			</label>
-			<label>
-				Location
-				<input v-model="newStock.location" type="text" maxlength="40" placeholder="pantry" />
-			</label>
+			<StockFormFields :model="newStock" name-placeholder="Rice" location-placeholder="pantry"
+				require-quantities />
 			<button type="submit" :disabled="creatingStock">{{ creatingStock ? 'Creating...' : 'Add stock line'
 			}}</button>
 		</form>
@@ -45,6 +27,7 @@
 
 <script setup lang="ts">
 import { useStockManager } from "../../composables/useStockManager";
+import StockFormFields from "./StockFormFields.vue";
 import StockListItem from "./StockListItem.vue";
 import StockPageHeader from "./StockPageHeader.vue";
 import StockSearchToolbar from "./StockSearchToolbar.vue";
@@ -92,13 +75,6 @@ const {
 	border-radius: 0.8rem;
 }
 
-.new-stock-form label {
-	display: flex;
-	flex-direction: column;
-	gap: 0.35rem;
-	font-size: 0.85rem;
-}
-
 .new-stock-form button {
 	grid-column: span 2;
 	padding: 0.55rem;
@@ -107,16 +83,6 @@ const {
 	background: var(--brand);
 	color: var(--surface);
 	font-weight: 700;
-}
-
-input {
-	width: 100%;
-	box-sizing: border-box;
-	padding: 0.45rem 0.55rem;
-	border-radius: 0.55rem;
-	border: 1px solid var(--surface-border);
-	background: var(--surface-strong);
-	color: var(--text-primary);
 }
 
 .status {
