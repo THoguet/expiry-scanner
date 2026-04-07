@@ -14,9 +14,42 @@ pub struct Product {
     pub image: Option<String>,
     pub expiration_date: chrono::NaiveDate,
     pub created_at: DateTime<Utc>,
+    pub was_previously_frozen: bool,
     #[allow(dead_code)]
     #[serde(skip_serializing)]
     #[ts(skip)]
+    pub client_id: Uuid,
+}
+
+#[derive(Serialize, FromRow, TS, Debug)]
+#[ts(export)]
+#[allow(dead_code)]
+pub struct FrozenProduct {
+    pub id: i64,
+    pub barcode: String,
+    pub name: String,
+    pub image: Option<String>,
+    pub frozen_date: chrono::NaiveDate,
+    pub created_at: DateTime<Utc>,
+    #[allow(dead_code)]
+    #[serde(skip_serializing)]
+    #[ts(skip)]
+    pub client_id: Uuid,
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct FreezeProduct {
+    pub product_id: i64,
+    pub client_id: Uuid,
+    pub total_portions: i32,
+    pub keep_in_fridge: i32,
+}
+
+#[derive(Deserialize, TS)]
+#[ts(export)]
+pub struct UnfreezeProduct {
+    pub frozen_product_id: i64,
     pub client_id: Uuid,
 }
 

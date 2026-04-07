@@ -8,6 +8,7 @@ const { loggerDebug } = vi.hoisted(() => ({
 vi.mock("/src/components/product/ProductList.vue", () => ({ default: {} }));
 vi.mock("/src/components/product/AddProduct.vue", () => ({ default: {} }));
 vi.mock("/src/components/stock/StockManager.vue", () => ({ default: {} }));
+vi.mock("/src/components/product/FreezerList.vue", () => ({ default: {} }));
 vi.mock("/src/services/logger.ts", () => ({
 	logger: {
 		debug: loggerDebug,

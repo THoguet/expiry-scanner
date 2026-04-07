@@ -8,6 +8,10 @@
 			:class="router.currentRoute.value.path === '/AddProduct' ? 'router-active' : ''">
 			<FontAwesomeIcon :icon="faCamera" />
 		</button>
+		<button type="button" @click="router.push('/Freezer')"
+			:class="router.currentRoute.value.path === '/Freezer' ? 'router-active' : ''" title="Freezer">
+			<FontAwesomeIcon :icon="faSnowflake" />
+		</button>
 		<button type="button" @click="router.push('/Stock')"
 			:class="router.currentRoute.value.path === '/Stock' ? 'router-active' : ''" title="Stock manager">
 			<FontAwesomeIcon :icon="faBoxesStacked" />
@@ -21,7 +25,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { faBoxesStacked, faCamera, faList, faCog } from '@fortawesome/free-solid-svg-icons';
+import { faBoxesStacked, faCamera, faList, faCog, faSnowflake } from '@fortawesome/free-solid-svg-icons';
 
 const router = useRouter();
 
@@ -51,7 +55,7 @@ function openClientIdModal() {
 .footer button {
 	color: var(--brand-strong);
 	height: 100%;
-	width: 25%;
+	width: 20%;
 	display: flex;
 	justify-content: center;
 	align-items: center;

@@ -10,6 +10,9 @@ import type { CreateStock } from "../bindings/CreateStock";
 import type { EditStock } from "../bindings/EditStock";
 import type { DeleteStock } from "../bindings/DeleteStock";
 import type { AdjustStockDelta } from "../bindings/AdjustStockDelta";
+import type { FrozenProduct } from "../bindings/FrozenProduct";
+import type { FreezeProduct } from "../bindings/FreezeProduct";
+import type { UnfreezeProduct } from "../bindings/UnfreezeProduct";
 import { logger } from "./logger";
 
 const DEFAULT_BACKEND_URL = "https://expiry.nessar.fr";
@@ -284,4 +287,47 @@ export async function adjustStockByDelta(stockId: Stock["id"], payload: AdjustSt
 	}
 
 	return updated;
+}
+
+export async function getFrozenProducts(clientId: string): Promise<FrozenProduct[]> {
+	logger.debug("Loading frozen products", { clientId });
+	const products = await request<FrozenProduct[]>(`/freezer?client_id=${encodeURIComponent(clientId)}`);
+	if (!products) return [];
+	return products;
+}
+
+export async function freezeProduct(payload: FreezeProduct): Promise<FrozenProduct[]> {
+	logger.info("Freezing product", {
+		productId: payload.product_id.toString(),
+		clientId: payload.client_id,
+		totalPortions: payload.total_portions,
+		keepInFridge: payload.keep_in_fridge,
+	});
+	const frozen = await request<FrozenProduct[]>("/freezer/freeze", {
+		method: "POST",
+		body: stringifyPayload(payload),
+	});
+
+	if (!frozen) {
+		throw new Error("Failed to freeze product");
+	}
+
+	return frozen;
+}
+
+export async function unfreezeProduct(payload: UnfreezeProduct): Promise<Product> {
+	logger.info("Unfreezing product", {
+		frozenProductId: payload.frozen_product_id.toString(),
+		clientId: payload.client_id,
+	});
+	const product = await request<Product>("/freezer/unfreeze", {
+		method: "POST",
+		body: stringifyPayload(payload),
+	});
+
+	if (!product) {
+		throw new Error("Failed to unfreeze product");
+	}
+
+	return product;
 }

@@ -36,6 +36,7 @@ function makeProduct(id: bigint, barcode: string): Product {
 		image: null,
 		expiration_date: "2026-04-01",
 		created_at: "2026-03-01T00:00:00Z",
+		was_previously_frozen: false,
 	};
 }
 

@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use tracing::debug;
 
 pub mod barcode;
+pub mod freezer;
 pub mod maintenance;
 pub mod product;
 pub mod stock;

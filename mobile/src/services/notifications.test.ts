@@ -28,6 +28,7 @@ function productWithBarcode(id: bigint, barcode: string): ProductWithBarcode {
 			image: null,
 			expiration_date: "2026-04-10",
 			created_at: "2026-03-01T00:00:00Z",
+			was_previously_frozen: false,
 		},
 		{ code: barcode, product_name: "Item " + barcode, image_url: null },
 	] as unknown as ProductWithBarcode;
@@ -42,6 +43,7 @@ function productWithNullName(id: bigint, barcode: string): ProductWithBarcode {
 			image: null,
 			expiration_date: "2026-04-10",
 			created_at: "2026-03-01T00:00:00Z",
+			was_previously_frozen: false,
 		},
 		{ code: barcode, product_name: null, image_url: null },
 	] as unknown as ProductWithBarcode;

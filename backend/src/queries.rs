@@ -6,7 +6,7 @@ use tracing::debug;
 
 use crate::models::{
     Barcode, BarcodePrefill, CreateProduct, CreateStock, CreateUserProductInfo, DeleteProduct,
-    DeleteStock, EditProduct, EditStock, Product, Stock, UserProductInfo,
+    DeleteStock, EditProduct, EditStock, FrozenProduct, Product, Stock, UserProductInfo,
 };
 
 #[derive(sqlx::FromRow)]
@@ -349,4 +349,116 @@ pub async fn delete_orphan_user_product_info(pool: &PgPool) -> Result<u64, Box<d
     let result = sqlx::query(query).execute(pool).await?;
 
     Ok(result.rows_affected())
+}
+
+pub async fn get_product_by_id(
+    pool: &PgPool,
+    product_id: i64,
+    client_id: uuid::Uuid,
+) -> Result<Product, Box<dyn Error>> {
+    debug!(product_id, client_id = %client_id, "query get_product_by_id called");
+    let query = "select * from products where id=$1 and client_id=$2";
+
+    let product = sqlx::query_as::<_, Product>(query)
+        .bind(product_id)
+        .bind(client_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(product)
+}
+
+pub async fn insert_frozen_product(
+    pool: &PgPool,
+    barcode: &str,
+    name: &str,
+    image: Option<&str>,
+    frozen_date: chrono::NaiveDate,
+    client_id: uuid::Uuid,
+) -> Result<FrozenProduct, Box<dyn Error>> {
+    debug!(barcode = %barcode, client_id = %client_id, "query insert_frozen_product called");
+    let query = "insert into frozen_products (barcode, name, image, frozen_date, client_id) values ($1, $2, $3, $4, $5) returning *";
+
+    let frozen = sqlx::query_as::<_, FrozenProduct>(query)
+        .bind(barcode)
+        .bind(name)
+        .bind(image)
+        .bind(frozen_date)
+        .bind(client_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(frozen)
+}
+
+pub async fn list_frozen_products(
+    pool: &PgPool,
+    client_id: uuid::Uuid,
+) -> Result<Vec<FrozenProduct>, Box<dyn Error>> {
+    debug!(client_id = %client_id, "query list_frozen_products called");
+    let query = "select * from frozen_products where client_id=$1 order by frozen_date desc";
+
+    let products = sqlx::query_as::<_, FrozenProduct>(query)
+        .bind(client_id)
+        .fetch_all(pool)
+        .await?;
+
+    Ok(products)
+}
+
+pub async fn get_frozen_product_by_id(
+    pool: &PgPool,
+    frozen_product_id: i64,
+    client_id: uuid::Uuid,
+) -> Result<FrozenProduct, Box<dyn Error>> {
+    debug!(frozen_product_id, client_id = %client_id, "query get_frozen_product_by_id called");
+    let query = "select * from frozen_products where id=$1 and client_id=$2";
+
+    let product = sqlx::query_as::<_, FrozenProduct>(query)
+        .bind(frozen_product_id)
+        .bind(client_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(product)
+}
+
+pub async fn delete_frozen_product(
+    pool: &PgPool,
+    frozen_product_id: i64,
+    client_id: uuid::Uuid,
+) -> Result<(), Box<dyn Error>> {
+    debug!(frozen_product_id, client_id = %client_id, "query delete_frozen_product called");
+    let query = "delete from frozen_products where id=$1 and client_id=$2";
+
+    sqlx::query(query)
+        .bind(frozen_product_id)
+        .bind(client_id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn insert_product_unfrozen(
+    pool: &PgPool,
+    barcode: &str,
+    name: &str,
+    image: Option<&str>,
+    expiration_date: chrono::NaiveDate,
+    client_id: uuid::Uuid,
+) -> Result<Product, Box<dyn Error>> {
+    debug!(barcode = %barcode, client_id = %client_id, "query insert_product_unfrozen called");
+    let query = "insert into products (barcode, name, image, expiration_date, was_previously_frozen, client_id) values ($1, $2, $3, $4, true, $5) returning *";
+
+    let product = sqlx::query_as::<_, Product>(query)
+        .bind(barcode)
+        .bind(name)
+        .bind(image)
+        .bind(expiration_date)
+        .bind(client_id)
+        .fetch_one(pool)
+        .await?;
+
+    Ok(product)
 }

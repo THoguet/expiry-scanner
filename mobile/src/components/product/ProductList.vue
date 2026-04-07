@@ -4,11 +4,14 @@
 		<div v-else-if="error" class="status-text">{{ error }}</div>
 		<div v-else class="inner-fridge">
 			<ProductBox v-for="product in products" :key="product[0].id.toString()" :product="product"
-				@deleteProductRequested="onDeleteProductRequested" @editProduct="openEditPanel(product)" />
+				@deleteProductRequested="onDeleteProductRequested" @editProduct="openEditPanel(product)"
+				@freezeRequested="onFreezeRequested" />
 			<div v-if="products.length === 0" class="status-text">
 				<p>Your fridge is empty! Add some products to get started.</p>
 			</div>
 			<EditProduct v-if="productToEdit" :product="productToEdit" @closeEditProductPanel="closeEditProductPanel" />
+			<FreezeDialog v-if="productToFreeze" :productId="productToFreeze.id" :productName="productToFreeze.name"
+				@close="productToFreeze = null" @freeze="onFreezeConfirmed" />
 		</div>
 	</div>
 </template>
@@ -17,18 +20,35 @@
 import { onMounted, ref } from 'vue';
 import { ProductWithBarcode } from '../../services/backend';
 import { removeProduct, useProducts } from '../../services/products';
+import { useFreezer } from '../../services/freezer';
 import { CLIENT_ID } from '../../main';
 import ProductBox from './ProductBox.vue';
 import EditProduct from './EditProduct.vue';
+import FreezeDialog from './FreezeDialog.vue';
+import type { Product } from '../../bindings/Product';
 
 const { products, loading, error, loadProducts, refreshProducts } = useProducts();
+const { freeze } = useFreezer();
 
 const productToEdit = ref<ProductWithBarcode | null>(null);
+const productToFreeze = ref<Product | null>(null);
 
 function openEditPanel(product: ProductWithBarcode) {
 	productToEdit.value = product;
 }
 
+function onFreezeRequested(product: Product) {
+	productToFreeze.value = product;
+}
+
+async function onFreezeConfirmed(productId: bigint, totalPortions: number, keepInFridge: number) {
+	try {
+		await freeze(productId, totalPortions, keepInFridge);
+		productToFreeze.value = null;
+	} catch (e) {
+		// Error is handled in the service layer
+	}
+}
 
 async function onDeleteProductRequested(product: ProductWithBarcode[0]) {
 	if (productToEdit.value && productToEdit.value[0].id === product.id) {

@@ -5,6 +5,7 @@ use tracing::debug;
 use crate::service;
 
 pub mod barcode;
+pub mod freezer;
 pub mod product;
 pub mod stock;
 
@@ -16,6 +17,7 @@ pub fn router(pool: PgPool) -> Router {
         .nest("/products", product::router())
         .nest("/stock", stock::router())
         .nest("/barcodes", barcode::router())
+        .nest("/freezer", freezer::router())
         .with_state(pool)
 }
 

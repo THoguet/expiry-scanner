@@ -1,6 +1,11 @@
 <template>
 	<div class="box" :style="`background-image: url('${getImageUrl()}')`" @pointerdown.stop="startTimerToDelete"
 		@pointerup="openEditPanel()" @pointercancel="clearTimerToDelete">
+		<span v-if="pro.was_previously_frozen" class="frozen-badge" title="Previously frozen — cannot be re-frozen">🧊</span>
+		<button v-if="!pro.was_previously_frozen" class="freeze-btn" title="Freeze this product"
+			@pointerdown.stop @pointerup.stop @click.stop="emitEvent('freezeRequested', pro)">
+			❄️
+		</button>
 		<div class="text-background">
 			<p>{{ getName() }}</p>
 			<div style="display: flex; align-items: center; gap: 0.5rem">
@@ -26,6 +31,7 @@ const props = defineProps<{
 const emitEvent = defineEmits<{
 	deleteProductRequested: [product: Product];
 	editProduct: [id: bigint];
+	freezeRequested: [product: Product];
 }>();
 
 const {

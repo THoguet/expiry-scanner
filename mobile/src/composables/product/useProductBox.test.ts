@@ -24,6 +24,7 @@ function makeProduct(): ProductWithBarcode {
 		image: null,
 		expiration_date: "2026-04-01",
 		created_at: "2026-03-01T00:00:00Z",
+		was_previously_frozen: false,
 	}, { code: "123", product_name: "Fallback Name", image_url: "https://img" }] as unknown as ProductWithBarcode;
 }
 

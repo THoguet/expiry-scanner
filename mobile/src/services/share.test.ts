@@ -23,6 +23,7 @@ describe('share service', () => {
 				image: null,
 				expiration_date: tomorrow.toISOString().split('T')[0],
 				created_at: new Date().toISOString(),
+				was_previously_frozen: false,
 			};
 
 			await shareProductExpiryAlert(product);
@@ -45,6 +46,7 @@ describe('share service', () => {
 				image: null,
 				expiration_date: tomorrow.toISOString().split('T')[0],
 				created_at: new Date().toISOString(),
+				was_previously_frozen: false,
 			};
 
 			await shareProductExpiryAlert(product);
@@ -63,6 +65,7 @@ describe('share service', () => {
 				image: null,
 				expiration_date: today.toISOString().split('T')[0],
 				created_at: new Date().toISOString(),
+				was_previously_frozen: false,
 			};
 
 			await shareProductExpiryAlert(product);
@@ -82,6 +85,7 @@ describe('share service', () => {
 				image: null,
 				expiration_date: yesterday.toISOString().split('T')[0],
 				created_at: new Date().toISOString(),
+				was_previously_frozen: false,
 			};
 
 			await shareProductExpiryAlert(product);
@@ -101,6 +105,7 @@ describe('share service', () => {
 				image: null,
 				expiration_date: tomorrow.toISOString().split('T')[0],
 				created_at: new Date().toISOString(),
+				was_previously_frozen: false,
 			};
 
 			const error = new Error('Share failed');
@@ -119,6 +124,7 @@ describe('share service', () => {
 				image: null,
 				expiration_date: tomorrow.toISOString().split('T')[0],
 				created_at: new Date().toISOString(),
+				was_previously_frozen: false,
 			};
 
 			await shareProductExpiryAlert(product);
