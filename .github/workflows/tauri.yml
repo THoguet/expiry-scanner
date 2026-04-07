@@ -81,7 +81,7 @@ jobs:
           - platform: ubuntu-22.04
             mobile: android
             rust-targets: aarch64-linux-android
-            args: "--apk"
+            args: "--apk --aab"
           # - platform: macos-latest
           #   mobile: ios
           #   rust-targets: aarch64-apple-ios,aarch64-apple-ios-sim
@@ -175,3 +175,13 @@ jobs:
             ## Install
             **Android**: download the `.apk` below and sideload it.
           files: mobile/src-tauri/gen/android/app/build/outputs/**/*.apk
+
+      - name: Publish to Play Store (internal track)
+        if: github.ref == 'refs/heads/main' && matrix.mobile == 'android'
+        continue-on-error: true
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.nessar.expiry_scanner
+          releaseFiles: mobile/src-tauri/gen/android/app/build/outputs/bundle/**/*.aab
+          track: internal
