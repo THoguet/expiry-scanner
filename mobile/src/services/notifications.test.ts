@@ -180,4 +180,23 @@ describe("notifications service", () => {
 		// Share should not be called
 		expect(shareProductExpiryAlert).not.toHaveBeenCalled();
 	});
+
+	it("handles share rejection in notification action gracefully", async () => {
+		const { shareProductExpiryAlert } = await import("./share");
+		vi.mocked(shareProductExpiryAlert).mockRejectedValue(new Error("share failed"));
+
+		mockIsPermissionGranted.mockResolvedValue(true);
+		const { checkPermissions, updateNotifications } = await import("./notifications");
+
+		await checkPermissions();
+		const actionCallback = mockOnAction.mock.calls[0][0];
+
+		await updateNotifications([productWithBarcode(1n, "fail-barcode")]);
+		const notificationId = mockSendNotification.mock.calls[0][0].id;
+
+		// Should not throw even though share rejects
+		await actionCallback({ id: notificationId });
+
+		expect(shareProductExpiryAlert).toHaveBeenCalled();
+	});
 });

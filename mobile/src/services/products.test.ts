@@ -165,4 +165,23 @@ describe("products service", () => {
 		expect(mockGetProductPrefill).toHaveBeenCalledWith("555", "client-delegate");
 		expect(mockUploadProductImage).toHaveBeenCalledWith("555", "client-delegate", expect.anything());
 	});
+
+	it("force-refreshes products bypassing cache", async () => {
+		mockGetProductsWithBarcode.mockResolvedValue([withBarcode(10n, "force")]);
+		const { useProducts } = await import("./products");
+		const service = useProducts("client-force");
+
+		await service.loadProducts(true);
+		expect(mockGetProductsWithBarcode).toHaveBeenCalledTimes(1);
+		expect(service.products.value).toHaveLength(1);
+	});
+
+	it("removes product that is not in the local list", async () => {
+		mockGetProductsWithBarcode.mockResolvedValue([]);
+		const { useProducts, removeProduct } = await import("./products");
+		await useProducts().loadProducts();
+
+		await removeProduct({ id: 999n, client_id: "mock-client" });
+		expect(mockDeleteProduct).toHaveBeenCalledWith({ id: 999n, client_id: "mock-client" });
+	});
 });

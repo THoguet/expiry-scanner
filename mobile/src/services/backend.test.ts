@@ -136,4 +136,53 @@ describe("backend service", () => {
 		await expect(backend.uploadProductImage("ean", "c", {} as File)).rejects.toThrow("Image upload failed (400): bad image");
 		await expect(backend.adjustStockByDelta(1n, { client_id: "c", delta: 1 })).rejects.toThrow("Failed to adjust stock");
 	});
+
+	it("fetches frozen products and returns empty on undefined", async () => {
+		(globalThis.fetch as unknown as ReturnType<typeof vi.fn>)
+			.mockResolvedValueOnce({ ok: true, status: 200, json: async () => [{ id: 1 }], text: async () => "" })
+			.mockResolvedValueOnce({ ok: true, status: 200, json: async () => undefined, text: async () => "" });
+		const backend = await import("./backend");
+
+		const result = await backend.getFrozenProducts("c");
+		expect(result).toEqual([{ id: 1 }]);
+		expect(globalThis.fetch).toHaveBeenCalledWith(
+			expect.stringContaining("/freezer?client_id=c"),
+			expect.any(Object),
+		);
+
+		const empty = await backend.getFrozenProducts("c");
+		expect(empty).toEqual([]);
+	});
+
+	it("freezes a product and throws on empty response", async () => {
+		(globalThis.fetch as unknown as ReturnType<typeof vi.fn>)
+			.mockResolvedValueOnce({ ok: true, status: 200, json: async () => [{ id: 10 }], text: async () => "" })
+			.mockResolvedValueOnce({ ok: true, status: 200, json: async () => undefined, text: async () => "" });
+		const backend = await import("./backend");
+
+		const frozen = await backend.freezeProduct({ product_id: 1n, client_id: "c", total_portions: 2, keep_in_fridge: 0 });
+		expect(frozen).toEqual([{ id: 10 }]);
+		expect(globalThis.fetch).toHaveBeenCalledWith(
+			expect.stringContaining("/freezer/freeze"),
+			expect.objectContaining({ method: "POST" }),
+		);
+
+		await expect(backend.freezeProduct({ product_id: 1n, client_id: "c", total_portions: 2, keep_in_fridge: 0 })).rejects.toThrow("Failed to freeze product");
+	});
+
+	it("unfreezes a product and throws on empty response", async () => {
+		(globalThis.fetch as unknown as ReturnType<typeof vi.fn>)
+			.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ id: 50 }), text: async () => "" })
+			.mockResolvedValueOnce({ ok: true, status: 200, json: async () => undefined, text: async () => "" });
+		const backend = await import("./backend");
+
+		const product = await backend.unfreezeProduct({ frozen_product_id: 10n, client_id: "c" });
+		expect(product).toEqual({ id: 50 });
+		expect(globalThis.fetch).toHaveBeenCalledWith(
+			expect.stringContaining("/freezer/unfreeze"),
+			expect.objectContaining({ method: "POST" }),
+		);
+
+		await expect(backend.unfreezeProduct({ frozen_product_id: 10n, client_id: "c" })).rejects.toThrow("Failed to unfreeze product");
+	});
 });
