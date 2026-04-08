@@ -1,4 +1,4 @@
-use axum::{extract::State, routing::get, Router};
+use axum::{extract::State, response::Html, routing::get, Router};
 use sqlx::PgPool;
 use tracing::debug;
 
@@ -14,6 +14,7 @@ pub fn router(pool: PgPool) -> Router {
     Router::new()
         .route("/health", get(health_check))
         .route("/db_check", get(db_check))
+        .route("/privacy_policy", get(privacy_policy))
         .nest("/products", product::router())
         .nest("/stock", stock::router())
         .nest("/barcodes", barcode::router())
@@ -38,4 +39,9 @@ async fn db_check(State(pool): State<PgPool>) -> &'static str {
             "DB FAIL"
         }
     }
+}
+
+async fn privacy_policy() -> Html<&'static str> {
+    debug!("privacy_policy called");
+    Html(include_str!("../privacy_policy.html"))
 }
