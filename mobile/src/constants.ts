@@ -24,8 +24,8 @@ export const CENTURY_PREFIX = "20";
  */
 const BARCODE_FORMAT_DEFINITIONS = [
 	[Format.EAN13, 13],
-	[Format.EAN8, 8],
 	[Format.UPC_A, 12],
+	[Format.EAN8, 8],
 	[Format.UPC_E, 8],
 ] as const;
 

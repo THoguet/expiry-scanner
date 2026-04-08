@@ -25,7 +25,12 @@ vi.mock("@tauri-apps/plugin-barcode-scanner", () => ({
 	checkPermissions: mockCheckPermissions,
 	requestPermissions: mockRequestPermissions,
 	scan: mockScan,
-	Format: { EAN13: "EAN_13", EAN8: "EAN_8" },
+	Format: {
+		EAN13: "EAN_13",
+		EAN8: "EAN_8",
+		UPC_A: "UPC_A",
+		UPC_E: "UPC_E",
+	},
 }));
 vi.mock("/src/main.ts", () => ({ CLIENT_ID: "client-add-form" }));
 vi.mock("/src/services/products.ts", () => ({

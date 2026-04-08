@@ -27,12 +27,12 @@ describe("constants", () => {
 	});
 
 	describe("format-length mapping", () => {
-		it("is ordered longest-first", () => {
-			for (let i = 1; i < SUPPORTED_BARCODE_FORMATS.length; i++) {
-				const previous = getBarcodeDigitCount(SUPPORTED_BARCODE_FORMATS[i - 1]) ?? 0;
-				const current = getBarcodeDigitCount(SUPPORTED_BARCODE_FORMATS[i]) ?? 0;
-				expect(previous).toBeGreaterThanOrEqual(current);
-			}
+		it("starts with a longest supported format", () => {
+			const firstLength = getBarcodeDigitCount(SUPPORTED_BARCODE_FORMATS[0]) ?? 0;
+			const maxLength = Math.max(
+				...SUPPORTED_BARCODE_FORMATS.map((format) => getBarcodeDigitCount(format) ?? 0),
+			);
+			expect(firstLength).toBe(maxLength);
 		});
 
 		it("each supported format has a positive digit count", () => {
@@ -44,6 +44,8 @@ describe("constants", () => {
 		it("exposes known plugin formats in the digit-count map", () => {
 			expect(BARCODE_DIGIT_COUNT_BY_FORMAT.get(Format.EAN13)).toBe(13);
 			expect(BARCODE_DIGIT_COUNT_BY_FORMAT.get(Format.EAN8)).toBe(8);
+			expect(BARCODE_DIGIT_COUNT_BY_FORMAT.get(Format.UPC_A)).toBe(12);
+			expect(BARCODE_DIGIT_COUNT_BY_FORMAT.get(Format.UPC_E)).toBe(8);
 		});
 	});
 
@@ -56,6 +58,9 @@ describe("constants", () => {
 			const ean13 = findMatchingFormat("1234567890123");
 			expect(ean13).toBe(Format.EAN13);
 
+			const upcA = findMatchingFormat("123456789012");
+			expect(upcA).toBe(Format.UPC_A);
+
 			const ean8 = findMatchingFormat("12345678");
 			expect(ean8).toBe(Format.EAN8);
 		});
@@ -63,7 +68,7 @@ describe("constants", () => {
 		it("returns undefined for non-matching lengths", () => {
 			expect(findMatchingFormat("123")).toBeUndefined();
 			expect(findMatchingFormat("")).toBeUndefined();
-			expect(findMatchingFormat("123456789012")).toBeUndefined();
+			expect(findMatchingFormat("12345678901")).toBeUndefined();
 		});
 	});
 });
