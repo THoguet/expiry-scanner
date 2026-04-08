@@ -7,7 +7,7 @@ export default defineConfig({
 		clearMocks: true,
 		coverage: {
 			provider: "istanbul",
-			reporter: ["text", "html"],
+			reporter: ["text", "html", "json", "lcov"],
 			include: ["src/**/*.ts"],
 			thresholds: {
 				lines: 90,
