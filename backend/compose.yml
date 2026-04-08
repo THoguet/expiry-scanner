@@ -20,5 +20,8 @@ services:
       RUST_LOG: ${RUST_LOG:-debug}
     depends_on:
       - db
+    volumes:
+      - product_images:/app/product_image
 volumes:
   postgres_data:
+  product_images:
