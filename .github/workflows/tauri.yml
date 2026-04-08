@@ -147,12 +147,14 @@ jobs:
         run: bun tauri ${{ matrix.mobile }} build ${{ matrix.args }}
 
       # -- 3. Upload Artifacts (Runs on all branches) --
-      - name: Upload APK Artifact
+      - name: Upload Android Artifacts
         if: matrix.mobile == 'android'
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
-          path: mobile/src-tauri/gen/android/app/build/outputs/**/*.apk
+          name: android-builds
+          path: |
+            mobile/src-tauri/gen/android/app/build/outputs/**/*.apk
+            mobile/src-tauri/gen/android/app/build/outputs/**/*.aab
           retention-days: 7
 
       # -- 4. Create Release (Runs ONLY on main branch for Android) --
@@ -174,7 +176,10 @@ jobs:
 
             ## Install
             **Android**: download the `.apk` below and sideload it.
-          files: mobile/src-tauri/gen/android/app/build/outputs/**/*.apk
+            The `.aab` is also attached for store distribution workflows.
+          files: |
+            mobile/src-tauri/gen/android/app/build/outputs/**/*.apk
+            mobile/src-tauri/gen/android/app/build/outputs/**/*.aab
 
       - name: Publish to Play Store (internal track)
         if: github.ref == 'refs/heads/main' && matrix.mobile == 'android'
