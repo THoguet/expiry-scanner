@@ -7,9 +7,15 @@
 			<div class="field-group">
 				<label for="productBarCode">Product Barcode</label>
 				<div class="barcode-row">
-					<input @input="goToNext" type="text" id="productBarCode" name="productBarCode"
-						v-model="productInfo.barCode" placeholder="Enter barcode" ref="productBarCodeInput"
-						maxlength="13" />
+					<div class="barcode-input-wrap">
+						<input @input="onBarcodeInput" type="text" id="productBarCode" name="productBarCode"
+							v-model="productInfo.barCode" placeholder="Enter barcode" ref="productBarCodeInput"
+							@keydown.enter.prevent="triggerBarcodeLookup" :maxlength="maxBarcodeLength" />
+						<button type="button" class="barcode-inline-btn" :disabled="!canLookupBarcode || prefilling"
+							@click="triggerBarcodeLookup" aria-label="Lookup barcode">
+							<FontAwesomeIcon :icon="faCheck" />
+						</button>
+					</div>
 					<button v-if="!scanning" type="button" :class="scanError ? 'scan-btn error-btn' : 'scan-btn'"
 						@click="startScan()">{{ scanError ?? 'Scan Product' }}</button>
 					<button v-else type="button" class="scan-btn cancel-btn" @click="cancelScan()">Cancel Scan</button>
@@ -34,17 +40,9 @@
 				<div class="field-group">
 					<label for="productName">Product Name *</label>
 					<input type="text" id="productName" v-model="productInfo.name" placeholder="Product name"
-						ref="productNameInput" @input="onNameInput" />
+						ref="productNameInput" @input="onNameInput" @keydown="onNameKeydown" />
 					<span v-if="showNameError" class="field-error">Product name is required</span>
 				</div>
-			</div>
-
-			<!-- Name Input (if no prefill) -->
-			<div v-else-if="productInfo.barCode && !prefilling" class="field-group">
-				<label for="productName">Product Name *</label>
-				<input type="text" id="productName" v-model="productInfo.name" placeholder="Enter product name"
-					ref="productNameInput" @input="onNameInput" />
-				<span v-if="showNameError" class="field-error">Product name is required</span>
 			</div>
 
 			<!-- Loading indicator for prefill -->
@@ -108,7 +106,7 @@
 </template>
 
 <script setup lang="ts">
-import { faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { useAddProductForm } from '../../composables/product/useAddProductForm';
 
@@ -123,6 +121,8 @@ const {
 	imageUploadError,
 	showNameError,
 	imagePreview,
+	maxBarcodeLength,
+	canLookupBarcode,
 	productBarCodeInput,
 	productNameInput,
 	expiryDayInput,
@@ -140,6 +140,9 @@ const {
 	startScan,
 	cancelScan,
 	getSourceLabel,
+	onBarcodeInput,
+	triggerBarcodeLookup,
+	onNameKeydown,
 } = useAddProductForm();
 
 void [

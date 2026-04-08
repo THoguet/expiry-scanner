@@ -74,6 +74,43 @@ input:disabled {
 .barcode-row {
 	display: flex;
 	align-items: center;
+	gap: 0.5rem;
+}
+
+.barcode-input-wrap {
+	position: relative;
+	flex: 1;
+}
+
+.barcode-input-wrap input {
+	padding-right: 2.75rem;
+}
+
+.barcode-inline-btn {
+	position: absolute;
+	top: 50%;
+	right: 0.35rem;
+	transform: translateY(-50%);
+	width: 2rem;
+	height: 2rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 6px;
+	background: var(--brand-soft);
+	color: var(--brand-strong);
+	cursor: pointer;
+	transition: filter 0.2s ease;
+}
+
+.barcode-inline-btn:hover {
+	filter: brightness(0.95);
+}
+
+.barcode-inline-btn:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 .scan-btn,
@@ -124,6 +161,10 @@ button.error-btn {
 	.barcode-row {
 		flex-direction: column;
 		align-items: stretch;
+	}
+
+	.barcode-input-wrap {
+		width: 100%;
 	}
 }
 

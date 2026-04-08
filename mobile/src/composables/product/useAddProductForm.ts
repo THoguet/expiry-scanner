@@ -2,12 +2,25 @@ import { emit } from "@tauri-apps/api/event";
 import {
 	cancel,
 	checkPermissions,
-	Format,
+	type Format,
 	requestPermissions,
 	scan,
 } from "@tauri-apps/plugin-barcode-scanner";
-import { onBeforeUnmount, onMounted, ref, watch, watchEffect } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from "vue";
 import type { ProductPrefill } from "../../bindings/ProductPrefill";
+import {
+	BARCODE_DEBOUNCE_MS,
+	CENTURY_PREFIX,
+	FOCUS_DELAY_MS,
+	getBarcodeDigitCount,
+	LONGEST_BARCODE_FORMAT,
+	MAX_BARCODE_LENGTH,
+	MAX_EXPIRY_YEARS_AHEAD,
+	MAX_IMAGE_SIZE_BYTES,
+	SUPPORTED_BARCODE_FORMATS,
+	TRANSIENT_ERROR_DURATION_MS,
+	findMatchingFormat,
+} from "../../constants";
 import { CLIENT_ID } from "../../main";
 import { addProduct, useProducts } from "../../services/products";
 import { logger } from "../../services/logger";
@@ -21,7 +34,8 @@ interface ProductInfo {
 }
 
 function currentYear2Digits(): string {
-	return String(new Date().getFullYear() % 100);
+	const fullYear = new Date().getFullYear();
+	return String(fullYear % parseInt(CENTURY_PREFIX + "00", 10));
 }
 
 export function useAddProductForm() {
@@ -53,7 +67,12 @@ export function useAddProductForm() {
 	const expiryYearInput = ref<HTMLInputElement | null>(null);
 	const cameraCaptureInput = ref<HTMLInputElement | null>(null);
 
-	const inputOrder = [productBarCodeInput, expiryDayInput, expiryMonthInput];
+	let barcodeLookupTimer: ReturnType<typeof setTimeout> | null = null;
+	let prefillGeneration = 0;
+
+	const canLookupBarcode = computed(() => Boolean(findMatchingFormat(productInfo.value.barCode.trim())));
+
+	const inputOrder = [expiryDayInput, expiryMonthInput];
 
 	watch(scanning, (isScanning) => {
 		document.body.classList.toggle("scan-active", isScanning);
@@ -100,6 +119,9 @@ export function useAddProductForm() {
 
 	onBeforeUnmount(() => {
 		logger.info("Add product form unmounted, cancelling scanner");
+		if (barcodeLookupTimer) {
+			clearTimeout(barcodeLookupTimer);
+		}
 		cancelScan();
 		document.body.classList.toggle("scan-active", false);
 	});
@@ -119,8 +141,8 @@ export function useAddProductForm() {
 	function isYearValid(year: string | null): boolean {
 		if (!year) return false;
 		const yearNum = parseInt(year, 10);
-		const currentYear = new Date().getFullYear() % 100;
-		return yearNum >= currentYear && yearNum <= currentYear + 20;
+		const currentYear = new Date().getFullYear() % parseInt(CENTURY_PREFIX + "00", 10);
+		return yearNum >= currentYear && yearNum <= currentYear + MAX_EXPIRY_YEARS_AHEAD;
 	}
 
 	function blurAllInputs(): void {
@@ -171,7 +193,7 @@ export function useAddProductForm() {
 				name: productInfo.value.name,
 				image: null,
 				image_base64: imageBase64,
-				expiration_date: `${"20" + productInfo.value.expiryYear}-${String(productInfo.value.expiryMonth).padStart(2, "0")}-${String(productInfo.value.expiryDay).padStart(2, "0")}`,
+				expiration_date: `${CENTURY_PREFIX + productInfo.value.expiryYear}-${String(productInfo.value.expiryMonth).padStart(2, "0")}-${String(productInfo.value.expiryDay).padStart(2, "0")}`,
 				client_id: CLIENT_ID,
 			});
 
@@ -193,6 +215,11 @@ export function useAddProductForm() {
 	}
 
 	function resetForm(): void {
+		if (barcodeLookupTimer) {
+			clearTimeout(barcodeLookupTimer);
+			barcodeLookupTimer = null;
+		}
+		prefillGeneration++;
 		productInfo.value = {
 			barCode: "",
 			name: "",
@@ -211,7 +238,7 @@ export function useAddProductForm() {
 		addError.value = message;
 		setTimeout(() => {
 			addError.value = null;
-		}, 3000);
+		}, TRANSIENT_ERROR_DURATION_MS);
 	}
 
 	function verifyProductInfo(): string | boolean {
@@ -226,7 +253,7 @@ export function useAddProductForm() {
 		}
 		const day = parseInt(productInfo.value.expiryDay, 10);
 		const month = parseInt(productInfo.value.expiryMonth, 10);
-		const year = parseInt("20" + productInfo.value.expiryYear, 10);
+		const year = parseInt(CENTURY_PREFIX + productInfo.value.expiryYear, 10);
 		if (Number.isNaN(day) || Number.isNaN(month) || Number.isNaN(year)) {
 			return "Invalid expiry date";
 		}
@@ -289,12 +316,11 @@ export function useAddProductForm() {
 
 		if (!file) return;
 
-		const maxSizeBytes = 10 * 1024 * 1024;
-		if (file.size > maxSizeBytes) {
+		if (file.size > MAX_IMAGE_SIZE_BYTES) {
 			imageUploadError.value = "Image must be smaller than 10MB";
 			setTimeout(() => {
 				imageUploadError.value = null;
-			}, 3000);
+			}, TRANSIENT_ERROR_DURATION_MS);
 			return;
 		}
 
@@ -341,7 +367,8 @@ export function useAddProductForm() {
 			}
 
 			scanning.value = true;
-			const result = await scan({ windowed: true, formats: [Format.EAN13, Format.EAN8] });
+			const scannerFormats: Format[] = [...SUPPORTED_BARCODE_FORMATS];
+			const result = await scan({ windowed: true, formats: scannerFormats });
 			scanning.value = false;
 			logger.debug("Barcode scan finished", {
 				hasResult: Boolean(result),
@@ -349,14 +376,15 @@ export function useAddProductForm() {
 			});
 
 			if (result) {
-				if (result.format !== Format.EAN13 && result.format !== Format.EAN8) {
+				const isSupported = SUPPORTED_BARCODE_FORMATS.includes(result.format as Format);
+				if (!isSupported) {
 					logger.warn("Scanned unsupported barcode format", { format: result.format });
 					scanError.value = "Scanned code is in invalid format (" + result.format + ")";
 					return;
 				}
 
 				productInfo.value.barCode = result.content;
-				await loadPrefill(result.content);
+				await loadPrefill(result.content, true);
 			}
 		} catch (error) {
 			logger.error("Barcode scan failed", { error });
@@ -364,12 +392,16 @@ export function useAddProductForm() {
 		}
 	}
 
-	async function loadPrefill(barcode: string): Promise<void> {
+	async function loadPrefill(barcode: string, shouldAdvanceFocus: boolean): Promise<void> {
+		const generation = ++prefillGeneration;
 		prefilling.value = true;
 		logger.debug("Loading barcode prefill", { barcode });
 		try {
 			const { getPrefill } = useProducts(CLIENT_ID);
 			const prefillData = await getPrefill(barcode);
+
+			if (generation !== prefillGeneration) return;
+
 			prefilled.value = prefillData;
 			logger.debug("Barcode prefill loaded", {
 				barcode,
@@ -379,12 +411,21 @@ export function useAddProductForm() {
 
 			if (prefillData.name) {
 				productInfo.value.name = prefillData.name;
+				if (shouldAdvanceFocus) {
+					setTimeout(() => {
+						expiryDayInput.value?.focus();
+					}, FOCUS_DELAY_MS);
+				}
+			} else {
+				if (shouldAdvanceFocus) {
+					setTimeout(() => {
+						productNameInput.value?.focus();
+					}, FOCUS_DELAY_MS);
+				}
 			}
-
-			setTimeout(() => {
-				productNameInput.value?.focus();
-			}, 100);
 		} catch (error) {
+			if (generation !== prefillGeneration) return;
+
 			logger.warn("Prefill lookup failed, using fallback", {
 				barcode,
 				error,
@@ -395,11 +436,15 @@ export function useAddProductForm() {
 				image: null,
 				source: "none",
 			};
-			setTimeout(() => {
-				productNameInput.value?.focus();
-			}, 100);
+			if (shouldAdvanceFocus) {
+				setTimeout(() => {
+					productNameInput.value?.focus();
+				}, FOCUS_DELAY_MS);
+			}
 		} finally {
-			prefilling.value = false;
+			if (generation === prefillGeneration) {
+				prefilling.value = false;
+			}
 		}
 	}
 
@@ -418,6 +463,65 @@ export function useAddProductForm() {
 		}
 	}
 
+	function onBarcodeInput(): void {
+		if (barcodeLookupTimer) {
+			clearTimeout(barcodeLookupTimer);
+			barcodeLookupTimer = null;
+		}
+
+		const trimmed = productInfo.value.barCode.trim();
+
+		if (prefilled.value && prefilled.value.barcode !== trimmed) {
+			prefilled.value = null;
+			productInfo.value.name = "";
+			imagePreview.value = null;
+			selectedImage.value = null;
+		}
+
+		const matchedFormat = findMatchingFormat(trimmed);
+		if (!matchedFormat) {
+			return;
+		}
+
+		if (matchedFormat === LONGEST_BARCODE_FORMAT) {
+			void loadPrefill(trimmed, true);
+			return;
+		}
+
+		barcodeLookupTimer = setTimeout(() => {
+			void loadPrefill(trimmed, false);
+		}, BARCODE_DEBOUNCE_MS);
+	}
+
+	function triggerBarcodeLookup(): void {
+		const trimmed = productInfo.value.barCode.trim();
+		const matchedFormat = findMatchingFormat(trimmed);
+		if (!matchedFormat) {
+			return;
+		}
+
+		if (matchedFormat !== LONGEST_BARCODE_FORMAT) {
+			logger.debug("Manual lookup started for shorter supported barcode format", {
+				barcode: trimmed,
+				format: matchedFormat,
+				digitCount: getBarcodeDigitCount(matchedFormat),
+			});
+		}
+
+		void loadPrefill(trimmed, matchedFormat === LONGEST_BARCODE_FORMAT);
+	}
+
+	function onNameKeydown(event: KeyboardEvent): void {
+		if (event.key === "Enter") {
+			event.preventDefault();
+			if (productInfo.value.name.trim()) {
+				expiryDayInput.value?.focus();
+			} else {
+				showNameError.value = true;
+			}
+		}
+	}
+
 	return {
 		scanning,
 		prefilling,
@@ -429,6 +533,8 @@ export function useAddProductForm() {
 		imageUploadError,
 		showNameError,
 		imagePreview,
+		maxBarcodeLength: MAX_BARCODE_LENGTH,
+		canLookupBarcode,
 		productBarCodeInput,
 		productNameInput,
 		expiryDayInput,
@@ -446,5 +552,8 @@ export function useAddProductForm() {
 		startScan,
 		cancelScan,
 		getSourceLabel,
+		onBarcodeInput,
+		triggerBarcodeLookup,
+		onNameKeydown,
 	};
 }

@@ -1,5 +1,6 @@
 import { ref } from "vue";
 import type { EditProduct as EditProductType } from "../../bindings/EditProduct";
+import { MAX_IMAGE_SIZE_BYTES, TRANSIENT_ERROR_DURATION_MS } from "../../constants";
 import { CLIENT_ID } from "../../main";
 import type { ProductWithBarcode } from "../../services/backend";
 import { removeProduct, saveEditedProduct, useProducts } from "../../services/products";
@@ -44,12 +45,11 @@ export function useEditProductForm(
 
 		if (!file) return;
 
-		const maxSizeBytes = 10 * 1024 * 1024;
-		if (file.size > maxSizeBytes) {
+		if (file.size > MAX_IMAGE_SIZE_BYTES) {
 			imageUploadError.value = "Image must be smaller than 10MB";
 			setTimeout(() => {
 				imageUploadError.value = null;
-			}, 3000);
+			}, TRANSIENT_ERROR_DURATION_MS);
 			return;
 		}
 
